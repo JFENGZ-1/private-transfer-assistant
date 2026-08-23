@@ -37,6 +37,15 @@ export type Message = {
   downloadUrl?: string
 }
 
+export type OcrJobStatus = 'done' | 'pending' | 'processing' | 'failed'
+
+export type OcrJobItem = Message & {
+  jobStatus: OcrJobStatus
+  attempts: number
+  error?: string | null
+  jobUpdatedAt: number
+}
+
 export type Share = {
   id: string
   messageId: string
@@ -98,3 +107,4 @@ export type SearchFilters = {
   pinned: boolean
   privateOnly: boolean
 }
+

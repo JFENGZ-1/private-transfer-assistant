@@ -84,6 +84,13 @@ export function openDatabase(config: AppConfig): AppDb {
   db.exec(`UPDATE sessions SET name=CASE WHEN kind='device' THEN COALESCE((SELECT name FROM devices WHERE devices.id=sessions.device_id),'长期设备') ELSE '临时设备' END WHERE name IS NULL OR trim(name)='';
     UPDATE messages SET source_name=COALESCE((SELECT name FROM devices WHERE devices.id=messages.source_device_id),CASE WHEN source_device_id IS NULL THEN '临时设备' ELSE '长期设备' END) WHERE source_name IS NULL OR trim(source_name)='';
     INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,unixepoch()*1000);`);
+  const searchIndexRepaired=db.prepare('SELECT 1 FROM schema_migrations WHERE version=6').get();
+  if(!searchIndexRepaired)db.transaction(()=>{
+    db.prepare('DELETE FROM messages_fts').run();
+    db.prepare(`INSERT INTO messages_fts(message_id,content,file_name,ocr_text,note,tags)
+      SELECT id,COALESCE(content,''),COALESCE(file_name,''),COALESCE(ocr_text,''),COALESCE(note,''),COALESCE(tags,'') FROM messages`).run();
+    db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(6,?)').run(Date.now());
+  })();
   return db;
 }
 
@@ -100,3 +107,4 @@ export function indexMessage(db: AppDb, id: string): void {
   db.prepare('DELETE FROM messages_fts WHERE message_id=?').run(id);
   if (row) db.prepare('INSERT INTO messages_fts(message_id,content,file_name,ocr_text,note,tags) VALUES(?,?,?,?,?,?)').run(row.id,row.content ?? '',row.file_name ?? '',row.ocr_text ?? '',row.note ?? '',row.tags ?? '');
 }
+

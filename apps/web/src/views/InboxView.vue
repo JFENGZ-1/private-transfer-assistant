@@ -4,12 +4,12 @@ import { ChevronDown, Combine, Download, Heart, Inbox, Lock, Pin, Trash2, Unlock
 import { api, errorText } from '../api'
 import { isTrusted, state } from '../state'
 import type { Message } from '../types'
-import { formatChatTimestamp, notify, requestConfirm, shouldShowChatTimestamp } from '../ui'
+import { formatChatTimestamp, notify, requestConfirm, shouldShowChatTimestamp, ui } from '../ui'
 import ComposerBar from '../components/ComposerBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MessageCard from '../components/MessageCard.vue'
 
-const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const pinnedOpen = ref(false); const timelineEnd = ref<HTMLElement>()
+const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const pinnedOpen = computed({ get: () => ui.inboxPinnedOpen, set: value => { ui.inboxPinnedOpen = value } }); const timelineEnd = ref<HTMLElement>()
 const pinned = computed(() => state.messages.filter(m => m.pinned).sort((a,b) => b.createdAt-a.createdAt))
 const regular = computed(() => state.messages.filter(m => !m.pinned).sort((a,b) => a.createdAt-b.createdAt))
 const timeline = computed(() => regular.value.map((message,index,array) => ({ message, label: shouldShowChatTimestamp(message.createdAt,array[index-1]?.createdAt) ? formatChatTimestamp(message.createdAt) : '' })))
@@ -50,3 +50,4 @@ onMounted(() => { void load(true); window.addEventListener('messages-changed', r
   <ComposerBar v-if="!selecting" @sent="add" />
   <div v-else class="batch-bar"><span>已选 {{ selected.length }} 条</span><button :disabled="selected.length < 2" @click="mergeSelected"><Combine :size="17" />合并</button><button :disabled="!selected.length" @click="batchDownload"><Download :size="17" />下载</button><button :disabled="!selected.length" @click="batch('favorite')"><Heart :size="17" />收藏</button><button :disabled="!selected.length" @click="batch('pin')"><Pin :size="17" />置顶</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('lock')"><Lock :size="17" />隐私</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('unlock')"><Unlock :size="17" />取消锁</button><button :disabled="!selected.length" @click="batch('delete')"><Trash2 :size="17" />删除</button><button @click="cancelSelection"><X :size="17" />取消</button></div>
 </section></template>
+
