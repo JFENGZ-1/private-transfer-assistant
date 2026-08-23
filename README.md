@@ -66,7 +66,7 @@ bash /root/bootstrap-baota-native.sh
 
 OCR 使用 RapidOCR 的 PaddleOCR 系轻量模型与 ONNX Runtime。它只在上传后异步建立索引，搜索请求不会即时运行 OCR。默认只有一个任务和一个推理线程，连续空闲 5 分钟后释放模型内存。
 
-## 首次部署（Docker）
+## 首次部署（Docker）未测试
 
 ```bash
 cp .env.example .env
