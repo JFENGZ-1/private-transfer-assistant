@@ -7,31 +7,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      manifest: {
-        name: '渡口 · 私人传输助手',
-        short_name: '渡口',
-        description: '私人文件传输与跨设备粘贴板',
-        theme_color: '#f6f3ed',
-        background_color: '#f6f3ed',
-        display: 'standalone',
-        start_url: '/',
-        share_target: {
-          action: '/share-target',
-          method: 'POST',
-          enctype: 'multipart/form-data',
-          params: {
-            title: 'title',
-            text: 'text',
-            url: 'url',
-            files: [{ name: 'files', accept: ['*/*'] }]
-          }
-        },
-        icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-        ]
-      },
+      manifest: false,
       workbox: {
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,css,html,woff2}']

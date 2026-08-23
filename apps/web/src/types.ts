@@ -80,6 +80,7 @@ export type Settings = {
   storage?: { used?: number; limit?: number | null; text?: number; images?: number; files?: number; trash?: number }
   retention?: { imagesDays?: number; filesDays?: number; trashDays?: number; downloadedEarlier?: boolean }
   defaultShare?: { expiresIn: number; maxDownloads?: number | null }
+  pwaIcon?: { custom: boolean; version: number }
   retentionDays?: number
 }
 
