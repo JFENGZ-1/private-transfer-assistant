@@ -24,6 +24,7 @@ Node.js / Fastify（systemd）
 
 - 支持 `apt`、`dnf` 和 `yum` 的现代 64 位 Linux。
 - 安装 Git、编译工具、SQLite、Python venv、OpenGL运行库等依赖。
+- CentOS 8 使用归档 AppStream 中的 GCC Toolset 11 编译 C++20 Node 原生模块，并在启动前执行真实 SQLite 内存库测试。
 - 检测 Node.js 22；没有时从 Node.js 官方下载并校验 SHA-256。
 - 检测 Python 3.10–3.13并创建独立虚拟环境。
 - 创建无登录权限的 `transfer` 用户。
@@ -548,6 +549,18 @@ curl -I https://nodejs.org/dist/latest-v22.x/
 ```
 
 脚本会校验官方 `SHASUMS256.txt`，校验失败不会安装。
+
+### `better-sqlite3` 提示 `GLIBC_2.29` 或 `-std=c++20`
+
+CentOS 8 的 GLIBC 版本低于部分预编译 Node 原生包的要求，系统自带 GCC 8 也不接受正式的 `-std=c++20` 参数。新版安装脚本会自动安装 GCC Toolset 11，将 `better-sqlite3` 改为本机源码编译，并在继续部署前实际打开一次 SQLite 内存数据库。
+
+如果使用旧脚本遇到此错误，不要升级或手动替换系统 GLIBC，也不要修改 `/usr/bin/g++`。直接重新执行最新一键命令：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh | bash
+```
+
+脚本会保留 `/etc/private-transfer-assistant.env`、数据库和文件，复用已经编译好的独立 Python，然后创建新的 release 继续安装。
 
 ### OCR 推理测试失败
 

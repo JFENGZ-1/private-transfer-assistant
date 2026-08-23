@@ -30,6 +30,8 @@ OS_VERSION_ID=""
 OS_PRETTY_NAME="未知系统"
 LEGACY_CENTOS8=false
 CENTOS8_VAULT_BASE=""
+GCC_TOOLSET_ROOT=""
+SYSTEMD_TOOLSET_ENV=""
 
 log() { printf '\n\033[1;32m[%s]\033[0m %s\n' "${APP_NAME}" "$*"; }
 warn() { printf '\n\033[1;33m[%s] 警告：\033[0m%s\n' "${APP_NAME}" "$*" >&2; }
@@ -164,7 +166,8 @@ install_system_packages() {
       ca-certificates curl git tar xz gcc gcc-c++ make findutils sqlite openssl iproute \
       glib2 libgomp dejavu-sans-fonts mesa-libGL \
       openssl-devel bzip2-devel libffi-devel zlib-devel xz-devel readline-devel \
-      sqlite-devel ncurses-devel gdbm-devel libuuid-devel expat-devel
+      sqlite-devel ncurses-devel gdbm-devel libuuid-devel expat-devel \
+      gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-binutils
   elif command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
@@ -186,6 +189,28 @@ install_system_packages() {
   else
     die "仅自动支持 apt、dnf 或 yum；请先手动安装 Node 构建工具、Python venv、SQLite、curl、tar 和 xz"
   fi
+}
+
+enable_centos8_cpp_toolset() {
+  [[ "${LEGACY_CENTOS8}" == true ]] || return
+  GCC_TOOLSET_ROOT="/opt/rh/gcc-toolset-11/root/usr"
+  [[ -x "${GCC_TOOLSET_ROOT}/bin/gcc" && -x "${GCC_TOOLSET_ROOT}/bin/g++" ]] \
+    || die "GCC Toolset 11 安装不完整"
+
+  export PATH="${GCC_TOOLSET_ROOT}/bin:${PATH}"
+  export LD_LIBRARY_PATH="${GCC_TOOLSET_ROOT}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+  export CC="${GCC_TOOLSET_ROOT}/bin/gcc"
+  export CXX="${GCC_TOOLSET_ROOT}/bin/g++"
+  SYSTEMD_TOOLSET_ENV="Environment=LD_LIBRARY_PATH=${GCC_TOOLSET_ROOT}/lib64"
+  export GCC_TOOLSET_ROOT SYSTEMD_TOOLSET_ENV
+
+  local major
+  major="$("${CXX}" -dumpversion | cut -d. -f1)"
+  [[ "${major}" =~ ^[0-9]+$ && "${major}" -ge 11 ]] || die "GCC Toolset 11 版本验证失败"
+  printf 'int main() { return 0; }\n' \
+    | "${CXX}" -x c++ -std=c++20 -c -o "${TEMP_DIR}/cxx20-check.o" - \
+    || die "GCC Toolset 11 无法编译 C++20"
+  log "CentOS 8 原生模块使用：$(${CXX} --version | head -n 1)"
 }
 
 install_legacy_python() {
@@ -466,6 +491,13 @@ copy_and_build_release() {
   [[ -f "${RELEASE_DIR}/apps/web/dist/index.html" ]] || die "前端构建产物缺失"
   chown -R root:transfer "${RELEASE_DIR}"
   chmod -R go-w,o-rwx,g+rX "${RELEASE_DIR}"
+  (
+    cd "${RELEASE_DIR}"
+    runuser -u transfer -- env \
+      "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}" \
+      "${NODE_BIN}" -e \
+      "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.prepare('select 1').get(); db.close(); console.log('better-sqlite3 native module OK')"
+  )
 }
 
 install_and_test_ocr() {
@@ -529,6 +561,7 @@ Group=transfer
 WorkingDirectory=${CURRENT_LINK}
 EnvironmentFile=${ENV_FILE}
 Environment=HOME=${DATA_DIR}
+${SYSTEMD_TOOLSET_ENV}
 ExecStart=${NODE_LINK} apps/server/dist/index.js
 Restart=on-failure
 RestartSec=5s
@@ -680,6 +713,7 @@ main() {
   configure_centos8_vault
   install_system_packages
   install_legacy_python
+  enable_centos8_cpp_toolset
   select_python
   ensure_python_venv
   ensure_node_22
