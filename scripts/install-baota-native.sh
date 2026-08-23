@@ -521,13 +521,17 @@ install_and_test_ocr() {
   fi
   "${VENV_DIR}/bin/python" -m pip install --upgrade pip setuptools wheel
   "${VENV_DIR}/bin/pip" install -r "${RELEASE_DIR}/ocr/requirements.txt"
-  chown -R root:transfer "${VENV_DIR}"
-  chmod -R go-w,o-rwx,g+rX "${VENV_DIR}"
 
-  runuser -u transfer -- env \
-    HOME="${DATA_DIR}" \
+  # RapidOCR 首次启动会把 ONNX 模型下载到自身的 site-packages。
+  # 先在封闭 release 中由安装阶段完成下载，再把整套运行文件设为只读。
+  install -d -o root -g root -m 0700 "${TEMP_DIR}/ocr-install-home"
+  env \
+    HOME="${TEMP_DIR}/ocr-install-home" \
     OCR_CPU_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \
     timeout 300s "${VENV_DIR}/bin/rapidocr" check
+
+  chown -R root:transfer "${VENV_DIR}"
+  chmod -R go-w,o-rwx,g+rX "${VENV_DIR}"
 
   (
     cd "${RELEASE_DIR}"
