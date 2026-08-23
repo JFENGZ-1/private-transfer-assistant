@@ -166,6 +166,8 @@ export const api = {
     const base = await request<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(patch) })
     return { ...base, retention: base.retention ?? { imagesDays: base.retentionDays, filesDays: base.retentionDays } }
   },
+  uploadPwaIcon: (icons: { icon192: Blob; icon512: Blob }) => { const form = new FormData(); form.append('icon192', icons.icon192, 'icon-192.png'); form.append('icon512', icons.icon512, 'icon-512.png'); return request<{ custom: boolean; version: number }>('/settings/pwa-icon', { method: 'POST', body: form }) },
+  resetPwaIcon: () => request<{ custom: boolean; version: number }>('/settings/pwa-icon', { method: 'DELETE' }),
   updatePasswords: (values: { adminPassword: string; newMainPassword?: string; newAdminPassword?: string; revokeDevices?: boolean }) => request<{ ok: boolean }>('/settings/passwords', { method: 'PUT', body: JSON.stringify(values) }),
   rerunOcr: (scope: 'failed' | 'all' | string) => request<{ ok: boolean; queued?: number }>('/ocr/reindex', { method: 'POST', body: JSON.stringify(scope === 'failed' || scope === 'all' ? { scope } : { messageId: scope }) }),
   emptyTrash: (adminPassword: string) => request<{ ok: boolean }>('/trash', { method: 'DELETE', body: JSON.stringify({ adminPassword }) }),
@@ -178,7 +180,7 @@ export function errorText(error: unknown): string {
     invalid_password: '主口令不正确', invalid_admin_password: '管理口令不正确', invalid_code: '提取码不正确', code_required: '请输入提取码', unauthorized: '会话已失效，请重新进入',
     trusted_device_required: '此操作仅限长期设备', payload_too_large: '文件超过上传限制', storage_full: '服务器存储空间不足',
     share_expired: '分享已过期', share_revoked: '分享已撤销', download_limit_reached: '下载次数已用完', drop_expired: '投递箱已过期',
-    network_error: '网络连接失败', passwords_must_differ: '主口令与管理口令必须不同', merge_requires_multiple: '请至少选择两条不同的消息', merge_text_only: '只能合并文本消息', merge_targeted_not_supported: '定向消息暂不支持合并', merged_content_too_large: '合并后的文本过长', csrf_rejected: '安全校验失败，请刷新页面后重试', request_failed: '请求失败'
+    network_error: '网络连接失败', passwords_must_differ: '主口令与管理口令必须不同', unsupported_pwa_icon: '请选择 PNG、JPEG 或 WebP 图片', pwa_icon_too_large: '应用图标不能超过 8 MB', invalid_pwa_icon: '图片无效或无法处理', merge_requires_multiple: '请至少选择两条不同的消息', merge_text_only: '只能合并文本消息', merge_targeted_not_supported: '定向消息暂不支持合并', merged_content_too_large: '合并后的文本过长', csrf_rejected: '安全校验失败，请刷新页面后重试', request_failed: '请求失败'
   }
   return labels[code] ?? (error instanceof Error ? error.message : '未知错误')
 }
