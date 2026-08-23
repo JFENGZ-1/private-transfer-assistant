@@ -562,6 +562,10 @@ curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant
 
 脚本会保留 `/etc/private-transfer-assistant.env`、数据库和文件，复用已经编译好的独立 Python，然后创建新的 release 继续安装。
 
+### 自动测试大量返回 `403`
+
+如果测试汇总显示 `29 failed | 6 passed`，并且多数断言实际收到 `403`，这是旧版安装脚本把正式域名 `PUBLIC_ORIGIN` 带进了隔离测试，触发了 CSRF 生产校验，并非项目数据或口令错误。最新版脚本已将构建测试和正式运行环境完全隔离。重新执行最新一键命令即可；已有 `/etc/private-transfer-assistant.env`、数据库和上传文件都会保留。
+
 ### OCR 推理测试失败
 
 脚本不会启用失败的 release。查看输出中的 Python、ONNX或模型错误，并确认内存、磁盘和出站网络：
