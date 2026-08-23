@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+node_modules
+**/node_modules
+**/dist
+data
+data-dev
+apps/server/data
+uploads
+backups
+coverage
+*.log
+.DS_Store

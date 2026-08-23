@@ -1,0 +1,20 @@
+{
+  "name": "private-transfer-assistant",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @transfer/server\" \"npm run dev -w @transfer/web\"",
+    "build": "npm run build -w @transfer/web && npm run build -w @transfer/server",
+    "test": "npm run test -w @transfer/server && npm run test -w @transfer/web",
+    "typecheck": "npm run typecheck -w @transfer/server && npm run typecheck -w @transfer/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

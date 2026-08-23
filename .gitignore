@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+data/
+data-dev/
+apps/server/data/
+uploads/
+backups/
+coverage/
+*.log
+.local-run/
+.DS_Store
+__pycache__/
+*.pyc
+*.tsbuildinfo
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
