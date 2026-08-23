@@ -367,7 +367,6 @@ create_runtime_config() {
     APP_PORT="$(read_env_value PORT)"
     PUBLIC_ORIGIN="$(read_env_value PUBLIC_ORIGIN)"
     DOMAIN="${PUBLIC_ORIGIN#https://}"
-    export APP_PORT PUBLIC_ORIGIN DOMAIN
     [[ "${APP_PORT}" =~ ^[0-9]+$ ]] || die "现有配置中的 PORT 无效"
     validate_domain "${DOMAIN}"
     return
@@ -433,7 +432,6 @@ EOF
   APP_PORT="${port}"
   DOMAIN="${domain}"
   PUBLIC_ORIGIN="https://${domain}"
-  export APP_PORT DOMAIN PUBLIC_ORIGIN
 }
 
 prepare_user_and_directories() {
@@ -483,7 +481,23 @@ copy_and_build_release() {
     cd "${RELEASE_DIR}"
     "${npm_bin}" ci --no-audit --no-fund
     "${npm_bin}" run typecheck
-    "${npm_bin}" test
+    # 正式域名等运行配置会启用 CSRF 生产校验，不能带入隔离测试。
+    env \
+      -u NODE_ENV \
+      -u HOST \
+      -u PORT \
+      -u DATA_DIR \
+      -u DB_PATH \
+      -u FILES_DIR \
+      -u UPLOAD_DIR \
+      -u TEMP_DIR \
+      -u WEB_DIST_DIR \
+      -u PUBLIC_ORIGIN \
+      -u TRUST_PROXY \
+      -u COOKIE_SECRET \
+      -u MAIN_PASSWORD \
+      -u ADMIN_PASSWORD \
+      "${npm_bin}" test
     "${npm_bin}" run build
     "${npm_bin}" prune --omit=dev --no-audit --no-fund
   )
@@ -743,3 +757,4 @@ main() {
 }
 
 main "$@"
+
