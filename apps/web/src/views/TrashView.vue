@@ -22,4 +22,3 @@ onUnmounted(() => window.removeEventListener('messages-changed', load))
   <div v-else class="message-list"><MessageCard v-for="message in items" :key="message.id" :message="message" trash :selectable="selecting" :selected="selected.includes(message.id)" @select="select" @restore="id => items = items.filter(m => m.id !== id)" @remove="id => items = items.filter(m => m.id !== id)" /></div>
   <div v-if="selecting" class="batch-bar batch-bar--compact"><span>已选 {{selected.length}} 条</span><button :disabled="!selected.length||operating" @click="batchRestore"><ArchiveRestore :size="17"/>恢复</button><button :disabled="!selected.length||operating" @click="batchDelete"><Trash2 :size="17"/>永久删除</button><button :disabled="operating" @click="toggleSelection"><X :size="17"/>取消</button></div>
 </section></template>
-

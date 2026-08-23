@@ -165,4 +165,3 @@ onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutsi
 .free-copy-panel .button-row, .free-edit-panel .button-row { display: grid; grid-template-columns: 1fr 1fr; margin-top: 0; }
 .free-copy-panel .button-row .secondary-button, .free-copy-panel .button-row .primary-button, .free-edit-panel .button-row .secondary-button, .free-edit-panel .button-row .primary-button { width: 100%; }
 </style>
-

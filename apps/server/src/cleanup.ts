@@ -20,4 +20,3 @@ export function startCleanup(app:FastifyInstance){
   let running=false;const execute=async()=>{if(running)return;running=true;try{await runCleanup(app);}catch(error){app.log.error(error,'automatic cleanup failed');}finally{running=false;}};
   const timer=setInterval(()=>void execute(),Math.max(60_000,app.config.cleanupIntervalMs));timer.unref();setImmediate(()=>void execute());app.addHook('onClose',async()=>clearInterval(timer));
 }
-

@@ -182,4 +182,3 @@ export function errorText(error: unknown): string {
   }
   return labels[code] ?? (error instanceof Error ? error.message : '未知错误')
 }
-

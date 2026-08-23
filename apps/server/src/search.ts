@@ -96,4 +96,3 @@ export async function searchRoutes(app: FastifyInstance) {
     return { items, pendingOcr, nextCursor: items.length === q.limit ? (items.at(-1) as { createdAt: number }).createdAt : null }
   })
 }
-

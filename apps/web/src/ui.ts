@@ -83,4 +83,3 @@ export function formatChatTimestamp(value: number, nowValue = Date.now()) {
 export function copyText(text: string) {
   return navigator.clipboard.writeText(text).then(() => notify('已复制到剪贴板', 'success'))
 }
-

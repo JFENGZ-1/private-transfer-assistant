@@ -107,4 +107,3 @@ export type SearchFilters = {
   pinned: boolean
   privateOnly: boolean
 }
-

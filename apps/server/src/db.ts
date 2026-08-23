@@ -107,4 +107,3 @@ export function indexMessage(db: AppDb, id: string): void {
   db.prepare('DELETE FROM messages_fts WHERE message_id=?').run(id);
   if (row) db.prepare('INSERT INTO messages_fts(message_id,content,file_name,ocr_text,note,tags) VALUES(?,?,?,?,?,?)').run(row.id,row.content ?? '',row.file_name ?? '',row.ocr_text ?? '',row.note ?? '',row.tags ?? '');
 }
-

@@ -50,4 +50,3 @@ onMounted(() => { void load(true); window.addEventListener('messages-changed', r
   <ComposerBar v-if="!selecting" @sent="add" />
   <div v-else class="batch-bar"><span>已选 {{ selected.length }} 条</span><button :disabled="selected.length < 2" @click="mergeSelected"><Combine :size="17" />合并</button><button :disabled="!selected.length" @click="batchDownload"><Download :size="17" />下载</button><button :disabled="!selected.length" @click="batch('favorite')"><Heart :size="17" />收藏</button><button :disabled="!selected.length" @click="batch('pin')"><Pin :size="17" />置顶</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('lock')"><Lock :size="17" />隐私</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('unlock')"><Unlock :size="17" />取消锁</button><button :disabled="!selected.length" @click="batch('delete')"><Trash2 :size="17" />删除</button><button @click="cancelSelection"><X :size="17" />取消</button></div>
 </section></template>
-

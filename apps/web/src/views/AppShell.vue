@@ -47,4 +47,3 @@ onMounted(() => { stopped = false; loadShared(); connect(); window.addEventListe
   <SearchOverlay :open="searchOpen" @close="searchOpen = false" />
   <Transition name="toast"><div v-if="ui.toast" class="toast" :class="ui.toastKind" role="status">{{ ui.toast }}</div></Transition>
 </div></template>
-

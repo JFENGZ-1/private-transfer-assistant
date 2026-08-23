@@ -86,4 +86,3 @@ onUnmounted(() => { document.removeEventListener('dragenter', onDragEnter); docu
     <Teleport to="body"><Transition name="fade"><div v-if="dragActive" class="global-drop-overlay"><div><Images :size="38" /><strong>松开以上传</strong><span>文件将加入上传队列，最多同时传输 2 个</span></div></div></Transition></Teleport>
   </div>
 </template>
-

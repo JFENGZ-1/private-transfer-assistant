@@ -53,4 +53,3 @@ export async function messageRoutes(app: FastifyInstance) {
 }
 
 export { one as visibleMessage };
-
