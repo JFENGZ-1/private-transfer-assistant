@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { Ban, Clock3, Copy, Download, Inbox, Link2, Plus, SendToBack, ShieldAlert } from 'lucide-vue-next'
+import { api, errorText } from '../api'
+import { isTrusted } from '../state'
+import type { Drop, Share } from '../types'
+import { copyText, formatBytes, formatTime, notify } from '../ui'
+import BaseDialog from '../components/BaseDialog.vue'
+import EmptyState from '../components/EmptyState.vue'
+
+const tab = ref<'shares'|'drops'>('shares'); const shares = ref<Share[]>([]); const drops = ref<Drop[]>([]); const loading = ref(true); const error = ref(''); const dropOpen = ref(false); const name = ref('给我投递文件'); const expiresIn = ref(86400); const maxUploads = ref<number|null>(5); const maxFileSizeMb = ref(500)
+async function load() { loading.value = true; try { if (isTrusted.value) { shares.value = (await api.shares()).items; drops.value = (await api.drops()).items } } catch(e) { error.value = errorText(e) } finally { loading.value = false } }
+async function revokeShare(id:string) { if (!confirm('撤销后链接将立即失效，继续？')) return; await api.revokeShare(id); shares.value = shares.value.filter(v=>v.id!==id) }
+async function revokeDrop(id:string) { if (!confirm('关闭后将无法继续投递，继续？')) return; await api.revokeDrop(id); drops.value = drops.value.filter(v=>v.id!==id) }
+async function createDrop() { try { const drop = await api.createDrop({ name:name.value, expiresIn:expiresIn.value, maxUploads:maxUploads.value, maxFileSize:maxFileSizeMb.value*1024*1024 }); drops.value.unshift(drop); dropOpen.value=false; notify('投递链接已创建','success') } catch(e){notify(errorText(e),'error')} }
+function shareLink(item: Share) { return item.url ?? `${location.origin}/s/${item.token}` } function dropLink(item: Drop) { return item.url ?? `${location.origin}/drop/${item.token}` }
+onMounted(load)
+</script>
+<template><section class="page"><header class="page-head"><div><p class="eyebrow">对外传递</p><h1>传输管理</h1></div><button v-if="tab==='drops' && isTrusted" class="primary-button compact" @click="dropOpen=true"><Plus :size="17" />新建</button></header>
+  <div class="segmented"><button :class="{active:tab==='shares'}" @click="tab='shares'"><Link2 :size="16" />临时分享</button><button :class="{active:tab==='drops'}" @click="tab='drops'"><SendToBack :size="16" />外部投递</button></div>
+  <div v-if="loading" class="skeleton-list"><i v-for="n in 3" :key="n" /></div><EmptyState v-else-if="error" :icon="ShieldAlert" title="传输记录读取失败" :description="error" />
+  <template v-else-if="tab==='shares'"><EmptyState v-if="!shares.length" :icon="Link2" title="暂无有效分享" description="在任意消息的操作菜单中创建临时分享。"/><div v-else class="transfer-list"><article v-for="item in shares" :key="item.id"><div class="transfer-icon"><Link2 :size="20" /></div><div><strong>{{ item.fileName || '单条内容分享' }}</strong><span><Clock3 :size="13" />{{ formatTime(item.expiresAt) }} 到期 · {{ item.downloads }} 次下载</span><small v-if="!item.url && !item.token">链接仅在创建时显示；此处可管理或撤销</small></div><div class="transfer-actions"><button v-if="item.url || item.token" class="icon-button" aria-label="复制分享链接" @click="copyText(shareLink(item))"><Copy :size="17" /></button><button class="icon-button danger-text" @click="revokeShare(item.id)"><Ban :size="17" /></button></div></article></div></template>
+  <template v-else><div v-if="!isTrusted" class="locked-panel"><ShieldAlert :size="28" /><h2>仅长期设备可创建投递箱</h2><p>请先在“我的”中输入管理口令，将当前设备设为长期设备。</p><RouterLink class="primary-button" to="/app/profile?upgrade=1">设为长期设备</RouterLink></div><EmptyState v-else-if="!drops.length" :icon="Inbox" title="还没有投递箱" description="创建一个限时入口，让他人只能向你上传。"><button class="primary-button" @click="dropOpen=true"><Plus :size="17" />创建投递箱</button></EmptyState><div v-else class="transfer-list"><article v-for="item in drops" :key="item.id"><div class="transfer-icon"><Inbox :size="20" /></div><div><strong>{{ item.name }}</strong><span>{{ item.uploads }} / {{ item.maxUploads ?? '∞' }} 次 · 单文件 {{ formatBytes(item.maxFileSize ?? 0) }}</span><small v-if="!item.url && !item.token">链接仅在创建时显示；需新链接时请重新创建</small></div><div class="transfer-actions"><button v-if="item.url || item.token" class="icon-button" aria-label="复制投递链接" @click="copyText(dropLink(item))"><Copy :size="17" /></button><button class="icon-button danger-text" @click="revokeDrop(item.id)"><Ban :size="17" /></button></div></article></div></template>
+  <BaseDialog :open="dropOpen" title="创建外部投递" @close="dropOpen=false"><form class="stack" @submit.prevent="createDrop"><label class="field"><span>投递箱标题</span><input v-model="name" maxlength="80" /></label><label class="field"><span>有效期</span><select v-model="expiresIn"><option :value="3600">1 小时</option><option :value="86400">24 小时</option><option :value="604800">7 天</option></select></label><div class="two-col"><label class="field"><span>最大投递次数</span><input v-model.number="maxUploads" type="number" min="1" /></label><label class="field"><span>单文件上限 MB</span><input v-model.number="maxFileSizeMb" type="number" min="1" /></label></div><button class="primary-button">创建投递链接</button></form></BaseDialog>
+</section></template>

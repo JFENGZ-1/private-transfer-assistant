@@ -1,0 +1,52 @@
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { createHash } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { Transform } from 'node:stream';
+import { nanoid } from 'nanoid';
+import { z } from 'zod';
+import { requireAuth } from './auth.js';
+import { indexMessage, setting } from './db.js';
+import { visibleMessage } from './messages.js';
+import { newToken, sha256 } from './security.js';
+import type { Principal } from './types.js';
+
+interface UploadPart { file:NodeJS.ReadableStream; filename:string; mimetype:string; fields?:Record<string,unknown>; }
+export function markMessageDownloaded(app:FastifyInstance,id:string){app.db.prepare(`INSERT INTO message_downloads(message_id,last_downloaded_at,download_count) VALUES(?,?,1) ON CONFLICT(message_id) DO UPDATE SET last_downloaded_at=excluded.last_downloaded_at,download_count=download_count+1`).run(id,Date.now());}
+const fieldValue=(fields:Record<string,unknown>|undefined,key:string)=>{const raw=fields?.[key] as {value?:unknown}|Array<{value?:unknown}>|undefined,entry=Array.isArray(raw)?raw.at(-1):raw;return entry?.value;};
+
+export async function saveUpload(app:FastifyInstance,req:FastifyRequest, trusted:boolean, dropId?:string){
+  const part=await req.file();if(!part)throw Object.assign(new Error('file_required'),{statusCode:400});
+  return saveUploadPart(app,part,req.principal,trusted,dropId);
+}
+
+export async function saveUploadPart(app:FastifyInstance,part:UploadPart,principal:Principal|undefined,trusted:boolean,dropId?:string){
+  const drop=dropId?app.db.prepare('SELECT max_file_size AS maxFileSize,allowed_types AS allowedTypes FROM drops WHERE id=?').get(dropId) as {maxFileSize?:number;allowedTypes:string}|undefined:undefined;
+  const allowed=drop?JSON.parse(drop.allowedTypes) as string[]:[];
+  if(allowed.length&&!allowed.some(x=>x.endsWith('/*')?part.mimetype.startsWith(x.slice(0,-1)):part.mimetype===x))throw Object.assign(new Error('file_type_not_allowed'),{statusCode:415});
+  const effectiveLimit=Math.min(app.config.maxFileSize,drop?.maxFileSize??Number.MAX_SAFE_INTEGER);
+  const temp=path.join(app.config.tempDir,nanoid());const h=createHash('sha256');let size=0;
+  const meter=new Transform({transform(chunk,_enc,cb){size+=chunk.length;if(size>effectiveLimit)return cb(Object.assign(new Error('file_too_large'),{statusCode:413}));h.update(chunk);cb(null,chunk);}});
+  try{await pipeline(part.file,meter,createWriteStream(temp,{flags:'wx'}));}catch(e){await fs.rm(temp,{force:true});throw e;}
+  const visibility=fieldValue(part.fields,'visibility')==='trusted_only'?'trusted_only':'normal';if(visibility==='trusted_only'&&!trusted){await fs.rm(temp,{force:true});throw Object.assign(new Error('trusted_device_required'),{statusCode:403});}
+  let targetDeviceIds:string[]=[];if(principal&&!dropId){const raw=fieldValue(part.fields,'targetDeviceIds');if(typeof raw==='string'&&raw){try{targetDeviceIds=z.array(z.string()).max(50).parse(JSON.parse(raw));}catch{await fs.rm(temp,{force:true});throw Object.assign(new Error('invalid_target_devices'),{statusCode:400});}}if(targetDeviceIds.length){const placeholders=targetDeviceIds.map(()=>'?').join(','),count=(app.db.prepare(`SELECT count(*) AS count FROM devices WHERE id IN (${placeholders}) AND revoked_at IS NULL AND expires_at>?`).get(...targetDeviceIds,Date.now()) as {count:number}).count;if(count!==new Set(targetDeviceIds).size){await fs.rm(temp,{force:true});throw Object.assign(new Error('invalid_target_devices'),{statusCode:400});}targetDeviceIds=[...new Set(targetDeviceIds)];}}
+  const digest=h.digest('hex');let blob=app.db.prepare('SELECT id,path FROM blobs WHERE sha256=?').get(digest) as {id:string;path:string}|undefined;
+  const storageLimit=Number(setting(app.db,'storage_limit_bytes')??app.config.storageLimitBytes??0);if(!blob&&storageLimit>0){const used=(app.db.prepare('SELECT COALESCE(SUM(size),0) AS used FROM blobs').get() as {used:number}).used;if(used+size>storageLimit){await fs.rm(temp,{force:true});throw Object.assign(new Error('storage_full'),{statusCode:507});}}
+  if(blob){await fs.rm(temp,{force:true});app.db.prepare('UPDATE blobs SET ref_count=ref_count+1 WHERE id=?').run(blob.id);}else{const id=nanoid(),dest=path.join(app.config.filesDir,digest.slice(0,2),digest);await fs.mkdir(path.dirname(dest),{recursive:true});await fs.rename(temp,dest);app.db.prepare('INSERT INTO blobs VALUES(?,?,?,?,?,?,?)').run(id,digest,size,dest,part.mimetype||'application/octet-stream',1,Date.now());blob={id,path:dest};}
+  const mid=nanoid(),ts=Date.now();app.db.transaction(()=>{app.db.prepare(`INSERT INTO messages(id,type,file_name,mime,blob_id,size,sha256,source_device_id,visibility,created_at,updated_at,ocr_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(mid,'file',part.filename,part.mimetype,blob.id,size,digest,principal?.deviceId??null,visibility,ts,ts,part.mimetype.startsWith('image/')?'pending':'none');for(const deviceId of targetDeviceIds)app.db.prepare('INSERT INTO message_targets(message_id,device_id) VALUES(?,?)').run(mid,deviceId);indexMessage(app.db,mid);if(part.mimetype.startsWith('image/'))app.db.prepare('INSERT OR IGNORE INTO ocr_jobs(id,message_id,status,created_at,updated_at) VALUES(?,?,?,?,?)').run(nanoid(),mid,'pending',ts,ts);})();
+  return visibleMessage(app,mid,true,principal?.deviceId)!;
+}
+
+export async function fileRoutes(app:FastifyInstance){
+  const upload=async(req:FastifyRequest,reply:any)=>{const item=await saveUpload(app,req,req.principal!.kind==='device'),targets=(app.db.prepare('SELECT device_id FROM message_targets WHERE message_id=?').all(item.id) as {device_id:string}[]).map(x=>x.device_id),audience=targets.length?[...new Set([...targets,...(req.principal!.deviceId?[req.principal!.deviceId]:[])])]:undefined;app.broadcast({type:'message.created',message:item},item.visibility==='trusted_only',audience);return reply.code(201).send(item);};
+  app.post('/api/uploads',{preHandler:requireAuth(app)},upload);
+  app.post('/api/messages/file',{preHandler:requireAuth(app)},upload);
+  app.get('/api/messages/:id/download',{preHandler:requireAuth(app)},async(req,reply)=>{const {id}=z.object({id:z.string()}).parse(req.params);const msg=visibleMessage(app,id,req.principal!.kind==='device',req.principal!.deviceId) as {blob_id?:string;fileName?:string;mime?:string}|undefined;const raw=app.db.prepare('SELECT blob_id FROM messages WHERE id=?').get(id) as {blob_id?:string}|undefined;if(!msg||!raw?.blob_id)return reply.code(404).send({error:'not_found'});const blob=app.db.prepare('SELECT path,mime,size FROM blobs WHERE id=?').get(raw.blob_id) as {path:string;mime:string;size:number};markMessageDownloaded(app,id);reply.header('Content-Type',blob.mime).header('Content-Length',blob.size).header('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(String(msg.fileName??'file'))}`);return reply.send(createReadStream(blob.path));});
+  app.post('/api/messages/:id/download-token',{preHandler:requireAuth(app)},async(req,reply)=>{const {id}=z.object({id:z.string()}).parse(req.params);const msg=visibleMessage(app,id,req.principal!.kind==='device',req.principal!.deviceId);const raw=app.db.prepare('SELECT blob_id FROM messages WHERE id=?').get(id) as {blob_id?:string}|undefined;if(!msg||!raw?.blob_id)return reply.code(404).send({error:'not_found'});const token=newToken(),expiresAt=Date.now()+60_000;app.db.prepare('DELETE FROM download_tokens WHERE expires_at<=?').run(Date.now());app.db.prepare('INSERT INTO download_tokens(token_hash,message_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(token),id,expiresAt,Date.now());return {token,expiresAt,url:`/api/downloads/${token}`};});
+  app.get('/api/downloads/:token',async(req,reply)=>{const {token}=z.object({token:z.string().min(20)}).parse(req.params);const ticket=app.db.prepare('DELETE FROM download_tokens WHERE token_hash=? AND expires_at>? RETURNING message_id AS messageId').get(sha256(token),Date.now()) as {messageId:string}|undefined;if(!ticket)return reply.code(404).send({error:'not_found'});const file=app.db.prepare('SELECT m.file_name AS fileName,b.path,b.mime,b.size FROM messages m JOIN blobs b ON b.id=m.blob_id WHERE m.id=? AND m.deleted_at IS NULL').get(ticket.messageId) as {fileName:string;path:string;mime:string;size:number}|undefined;if(!file)return reply.code(404).send({error:'not_found'});markMessageDownloaded(app,ticket.messageId);return reply.header('Content-Type',file.mime).header('Content-Length',file.size).header('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`).send(createReadStream(file.path));});
+  app.post('/share-target',{preHandler:requireAuth(app,true)},async(req,reply)=>{if(!req.isMultipart())return reply.code(415).send({error:'multipart_required'});const values:Record<string,string>={};for await(const part of req.parts()){if(part.type==='field'){if(['title','text','url'].includes(part.fieldname))values[part.fieldname]=String(part.value??'').slice(0,1_000_000);}else{const fileMessage=await saveUploadPart(app,part,req.principal,true);app.broadcast({type:'message.created',message:fileMessage});}}
+    const pieces=[values.title,values.text,values.url].filter((value,index,array)=>value&&array.indexOf(value)===index);if(pieces.length){const id=nanoid(),ts=Date.now(),content=pieces.join('\n');app.db.prepare(`INSERT INTO messages(id,type,content,source_device_id,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`).run(id,'text',content,req.principal!.deviceId??null,'normal',ts,ts);indexMessage(app.db,id);const message=visibleMessage(app,id,true,req.principal!.deviceId)!;app.broadcast({type:'message.created',message});}
+    return reply.code(303).header('Location','/app').send();});
+}

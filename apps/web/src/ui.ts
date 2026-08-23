@@ -1,0 +1,53 @@
+import { reactive } from 'vue'
+
+export const ui = reactive({
+  toast: '' as string,
+  toastKind: 'info' as 'info' | 'success' | 'error',
+})
+
+let timer = 0
+export function notify(message: string, kind: 'info' | 'success' | 'error' = 'info') {
+  ui.toast = message
+  ui.toastKind = kind
+  window.clearTimeout(timer)
+  timer = window.setTimeout(() => { ui.toast = '' }, 3200)
+}
+
+export function formatBytes(bytes = 0) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`
+}
+
+export function formatTime(value: number) {
+  const date = new Date(value)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+export function shouldShowChatTimestamp(value: number, previous?: number) {
+  if (previous === undefined) return true
+  const currentDate = new Date(value)
+  const previousDate = new Date(previous)
+  return currentDate.toDateString() !== previousDate.toDateString() || value - previous >= 5 * 60 * 1000
+}
+
+export function formatChatTimestamp(value: number, nowValue = Date.now()) {
+  const date = new Date(value)
+  const now = new Date(nowValue)
+  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const daysAgo = Math.round((today - day) / 86400000)
+  if (daysAgo === 0) return time
+  if (daysAgo === 1) return `昨天 ${time}`
+  if (daysAgo > 1 && daysAgo < 7) return `${date.toLocaleDateString('zh-CN', { weekday: 'short' })} ${time}`
+  if (date.getFullYear() === now.getFullYear()) return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${time}`
+}
+
+export function copyText(text: string) {
+  return navigator.clipboard.writeText(text).then(() => notify('已复制到剪贴板', 'success'))
+}

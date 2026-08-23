@@ -1,0 +1,143 @@
+name: private-transfer-assistant
+
+services:
+  app:
+    image: private-transfer-assistant-app:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATA_DIR: /data
+      DB_PATH: /data/transfer.db
+      FILES_DIR: /data/files
+      UPLOAD_DIR: /data/files
+      TEMP_DIR: /data/tmp
+      COOKIE_SECRET: ${COOKIE_SECRET:?请在 .env 中设置 COOKIE_SECRET}
+      MAIN_PASSWORD: ${MAIN_PASSWORD:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10737418240}
+      TEMP_SESSION_HOURS: ${TEMP_SESSION_HOURS:-12}
+      DEVICE_DAYS: ${DEVICE_DAYS:-90}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?请在 .env 中设置完整的 HTTPS 站点地址}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+    volumes:
+      - transfer_data:/data
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.25
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/auth/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  backup:
+    image: private-transfer-assistant-app:local
+    profiles: ["tools"]
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    environment:
+      DATA_DIR: /data
+      DB_PATH: /data/transfer.db
+      FILES_DIR: /data/files
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-0}
+    volumes:
+      - transfer_data:/data:ro
+      - ./backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    command: ["bash", "scripts/backup.sh"]
+
+  ocr:
+    build:
+      context: .
+      dockerfile: ocr/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DATA_DIR: /data
+      DB_PATH: /data/transfer.db
+      FILES_DIR: /data/files
+      UPLOAD_DIR: /data/files
+      TEMP_DIR: /data/tmp
+      OCR_ENABLED: ${OCR_ENABLED:-true}
+      OCR_POLL_SECONDS: ${OCR_POLL_SECONDS:-3}
+      OCR_MAX_EDGE: ${OCR_MAX_EDGE:-2200}
+      OCR_DET_LIMIT_SIDE: ${OCR_DET_LIMIT_SIDE:-1280}
+      OCR_MAX_IMAGE_PIXELS: ${OCR_MAX_IMAGE_PIXELS:-40000000}
+      OCR_MIN_SCORE: ${OCR_MIN_SCORE:-0.45}
+      OCR_MAX_ATTEMPTS: ${OCR_MAX_ATTEMPTS:-3}
+      OCR_STALE_AFTER_SECONDS: ${OCR_STALE_AFTER_SECONDS:-900}
+      OCR_RELEASE_MODEL_AFTER_SECONDS: ${OCR_RELEASE_MODEL_AFTER_SECONDS:-300}
+      OCR_CPU_THREADS: ${OCR_CPU_THREADS:-1}
+      OMP_NUM_THREADS: ${OCR_CPU_THREADS:-1}
+      OPENBLAS_NUM_THREADS: ${OCR_CPU_THREADS:-1}
+      MKL_NUM_THREADS: ${OCR_CPU_THREADS:-1}
+      NUMEXPR_NUM_THREADS: ${OCR_CPU_THREADS:-1}
+    volumes:
+      - transfer_data:/data
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 896m
+    cpus: 1.0
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /var/log/caddy:size=16m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: 0.25
+
+volumes:
+  transfer_data:
+  caddy_data:
+  caddy_config:
