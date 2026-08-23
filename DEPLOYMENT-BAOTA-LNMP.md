@@ -581,6 +581,8 @@ df -h
 journalctl -u private-transfer-assistant-ocr -n 200 --no-pager
 ```
 
+如果错误是 RapidOCR 下载模型时无法写入 `.venv/.../site-packages/rapidocr/models`，并显示 `PermissionError: [Errno 13]`，说明使用了先锁定虚拟环境权限、后下载模型的旧安装脚本。最新版会先在新 release 内预下载模型，随后将程序目录设为只读，最后再以低权限 `transfer` 用户执行真实 OCR 推理测试。重新运行最新一键安装命令即可，现有配置和数据不会被覆盖。
+
 ### 502 Bad Gateway
 
 ```bash
