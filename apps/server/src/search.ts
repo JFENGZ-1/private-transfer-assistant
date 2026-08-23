@@ -84,6 +84,13 @@ export async function searchRoutes(app: FastifyInstance) {
       const rows = app.db.prepare(`SELECT ${fields},snippet(messages_fts,-1,'<mark>','</mark>','…',18) AS snippet,bm25(messages_fts) AS _rank FROM messages_fts f JOIN messages m ON m.id=f.message_id WHERE messages_fts MATCH @query AND ${where.join(' AND ')} AND ${plan.row} ORDER BY _rank,m.created_at DESC LIMIT @limit`).all({ ...params, query }) as (Record<string, unknown> & { id: string; _rank: number })[]
       for (const row of rows) if (!matches.has(row.id) || row._rank < matches.get(row.id)!._rank) matches.set(row.id, { ...row, matchScope: plan.scope })
     }
+    // unicode61 treats an uninterrupted Chinese sentence as one token, so FTS cannot
+    // find a shorter phrase inside it. Keep FTS for ranking and use a bounded OCR-only
+    // substring fallback so Chinese OCR remains discoverable on small private servers.
+    if (scopes.includes('ocr')) {
+      const rows = app.db.prepare(`SELECT ${fields},substr(m.ocr_text,max(1,instr(lower(m.ocr_text),lower(@ocrPhrase))-30),length(@ocrPhrase)+90) AS snippet,1000 AS _rank FROM messages m WHERE ${where.join(' AND ')} AND m.mime LIKE 'image/%' AND instr(lower(COALESCE(m.ocr_text,'')),lower(@ocrPhrase))>0 ORDER BY m.created_at DESC LIMIT @limit`).all({ ...params, ocrPhrase: phrase }) as (Record<string, unknown> & { id: string; _rank: number })[]
+      for (const row of rows) if (!matches.has(row.id)) matches.set(row.id, { ...row, matchScope: 'ocr' })
+    }
     const items = [...matches.values()].sort((a, b) => a._rank - b._rank || Number(b.createdAt) - Number(a.createdAt)).slice(0, q.limit).map(({ _rank: _unused, ...item }) => item)
     const pendingOcr = scopes.includes('ocr') ? (app.db.prepare(`SELECT count(*) AS count FROM messages m WHERE m.deleted_at IS NULL AND m.ocr_status IN ('pending','processing') AND ${visibleSql(principal.kind, Boolean(principal.deviceId)).join(' AND ')}`).get({ principalDevice: principal.deviceId }) as { count: number }).count : 0
     return { items, pendingOcr, nextCursor: items.length === q.limit ? (items.at(-1) as { createdAt: number }).createdAt : null }

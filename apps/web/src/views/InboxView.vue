@@ -4,12 +4,12 @@ import { ChevronDown, Combine, Download, Heart, Inbox, Lock, Pin, Trash2, Unlock
 import { api, errorText } from '../api'
 import { isTrusted, state } from '../state'
 import type { Message } from '../types'
-import { formatChatTimestamp, notify, requestConfirm, shouldShowChatTimestamp } from '../ui'
+import { formatChatTimestamp, notify, requestConfirm, shouldShowChatTimestamp, ui } from '../ui'
 import ComposerBar from '../components/ComposerBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MessageCard from '../components/MessageCard.vue'
 
-const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const pinnedOpen = ref(false); const timelineEnd = ref<HTMLElement>()
+const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const pinnedOpen = computed({ get: () => ui.inboxPinnedOpen, set: value => { ui.inboxPinnedOpen = value } }); const timelineEnd = ref<HTMLElement>()
 const pinned = computed(() => state.messages.filter(m => m.pinned).sort((a,b) => b.createdAt-a.createdAt))
 const regular = computed(() => state.messages.filter(m => !m.pinned).sort((a,b) => a.createdAt-b.createdAt))
 const timeline = computed(() => regular.value.map((message,index,array) => ({ message, label: shouldShowChatTimestamp(message.createdAt,array[index-1]?.createdAt) ? formatChatTimestamp(message.createdAt) : '' })))

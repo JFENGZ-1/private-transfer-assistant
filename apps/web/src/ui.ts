@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 export const ui = reactive({
   toast: '' as string,
   toastKind: 'info' as 'info' | 'success' | 'error',
+  inboxPinnedOpen: false,
 })
 
 export const confirmDialog = reactive({

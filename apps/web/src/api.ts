@@ -1,4 +1,4 @@
-import type { Device, Drop, Message, Principal, SearchFilters, Settings, Share } from './types'
+import type { Device, Drop, Message, OcrJobItem, OcrJobStatus, Principal, SearchFilters, Settings, Share } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 let temporaryToken = ''
@@ -82,7 +82,7 @@ export const api = {
     xhr.send(form)
   }),
   updateMessage: async (id: string, patch: Partial<Pick<Message, 'content' | 'favorite' | 'pinned' | 'visibility' | 'tags' | 'note'>>) => normalizeMessage(await request<Message>(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })),
-  batchMessages: (ids: string[], action: 'delete' | 'restore' | 'favorite' | 'unfavorite' | 'pin' | 'unpin' | 'lock' | 'unlock') => request<{ updated: number }>('/messages/batch', { method: 'POST', body: JSON.stringify({ ids, action }) }),
+  batchMessages: (ids: string[], action: 'delete' | 'restore' | 'purge' | 'favorite' | 'unfavorite' | 'pin' | 'unpin' | 'lock' | 'unlock') => request<{ updated: number }>('/messages/batch', { method: 'POST', body: JSON.stringify({ ids, action }) }),
   mergeMessages: async (ids: string[]) => normalizeMessage(await request<Message>('/messages/merge', { method: 'POST', body: JSON.stringify({ ids }) })),
   removeMessage: (id: string, permanent = false) => request<{ ok: boolean }>(`/messages/${id}${queryString({ permanent })}`, { method: 'DELETE' }),
   restoreMessage: (id: string) => request<Message>(`/messages/${id}/restore`, { method: 'POST' }),
@@ -156,6 +156,11 @@ export const api = {
     const [base, ocr] = await Promise.all([request<Settings>('/settings'), request<{ enabled: boolean; counts: { status: string; count: number }[] }>('/ocr/status').catch(() => null)])
     const count = (name: string) => ocr?.counts.find(row => row.status === name)?.count ?? 0
     return { ...base, retention: base.retention ?? { imagesDays: base.retentionDays, filesDays: base.retentionDays }, ocr: { completed: count('done'), pending: count('pending'), processing: count('processing'), failed: count('failed') } }
+  },
+  retentionSummary: () => request<{ imagesDays: number; filesDays: number; trashDays: number; downloadedEarlier: boolean }>('/settings/retention'),
+  ocrJobs: async (status: OcrJobStatus, offset = 0, limit = 40) => {
+    const data = await request<{ items: OcrJobItem[]; total: number; nextOffset: number | null }>(`/ocr/jobs${queryString({ status, offset, limit })}`)
+    return { ...data, items: data.items.map(item => ({ ...normalizeMessage(item), jobStatus: item.jobStatus, attempts: item.attempts, error: item.error, jobUpdatedAt: item.jobUpdatedAt })) as OcrJobItem[] }
   },
   updateSettings: async (patch: Partial<Settings>) => {
     const base = await request<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(patch) })

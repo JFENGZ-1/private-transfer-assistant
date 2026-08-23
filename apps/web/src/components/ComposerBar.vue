@@ -7,7 +7,7 @@ import type { Message, UploadTask } from '../types'
 import { formatBytes, notify } from '../ui'
 
 const emit = defineEmits<{ sent: [message: Message] }>()
-const content = ref(''); const open = ref(false); const fileInput = ref<HTMLInputElement>(); const imageInput = ref<HTMLInputElement>(); const textarea = ref<HTMLTextAreaElement>(); const sending = ref(false)
+const content = ref(''); const open = ref(false); const fileInput = ref<HTMLInputElement>(); const imageInput = ref<HTMLInputElement>(); const cameraInput = ref<HTMLInputElement>(); const textarea = ref<HTMLTextAreaElement>(); const sending = ref(false)
 const dragActive = ref(false); let dragDepth = 0; let activeUploads = 0
 async function sendText() { const value = content.value.trim(); if (!value || sending.value) return; sending.value = true; try { const message = await api.sendText(value); content.value = ''; emit('sent', message) } catch (e) { notify(errorText(e), 'error') } finally { sending.value = false } }
 function enqueueFiles(files: File[]) {
@@ -22,6 +22,7 @@ async function startUpload(task: UploadTask) {
   finally { activeUploads -= 1; pumpUploads() }
 }
 function selectFiles(event: Event) { const files = [...((event.target as HTMLInputElement).files ?? [])]; open.value = false; enqueueFiles(files); (event.target as HTMLInputElement).value = '' }
+function chooseFiles(input?:HTMLInputElement){open.value=false;input?.click()}
 function cancel(task: UploadTask) { task.status = 'cancelled'; task.controller?.abort(); const index = state.uploads.indexOf(task); if (index >= 0) state.uploads.splice(index, 1); pumpUploads() }
 function handlePaste(event: ClipboardEvent) { const images = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith('image/')); if (!images.length) return; event.preventDefault(); enqueueFiles(images); notify(`已从剪贴板加入 ${images.length} 张图片`, 'success') }
 function resizeTextarea() {
@@ -76,11 +77,11 @@ onUnmounted(() => { document.removeEventListener('dragenter', onDragEnter); docu
   <div class="composer-shell">
     <div v-if="state.uploads.length" class="upload-tray"><div v-for="task in state.uploads" :key="task.id" class="upload-item"><div><strong>{{ task.file.name }}</strong><span>{{ task.status === 'error' ? task.error : task.status === 'queued' ? `${formatBytes(task.file.size)} · 等待上传` : `${formatBytes(task.file.size)} · ${Math.round(task.progress*100)}%` }}</span><div class="progress"><i :class="{ error: task.status === 'error' }" :style="{ width: `${Math.max(task.progress*100, task.status === 'error' ? 100 : 0)}%` }" /></div></div><button class="icon-button" @click="cancel(task)"><X :size="17" /></button></div></div>
     <form class="composer" @submit.prevent="sendText">
-      <div class="attach-wrap"><button type="button" class="icon-button attach" aria-label="添加附件" @click="open = !open"><Paperclip :size="21" /></button><Transition name="fade"><div v-if="open" class="attach-menu"><button type="button" @click="imageInput?.click()"><Camera :size="19" /><span>拍照或相册</span></button><button type="button" @click="imageInput?.click()"><Image :size="19" /><span>选择图片</span></button><button type="button" @click="fileInput?.click()"><File :size="19" /><span>选择文件</span></button></div></Transition></div>
+      <div class="attach-wrap"><button type="button" class="icon-button attach" aria-label="添加附件" @click="open = !open"><Paperclip :size="21" /></button><Transition name="fade"><div v-if="open" class="attach-menu"><button type="button" @click="chooseFiles(cameraInput)"><Camera :size="19" /><span>拍照</span></button><button type="button" @click="chooseFiles(imageInput)"><Image :size="19" /><span>选择图片</span></button><button type="button" @click="chooseFiles(fileInput)"><File :size="19" /><span>选择文件</span></button></div></Transition></div>
       <button type="button" class="icon-button attach quick-paste" aria-label="快速粘贴" title="快速粘贴" @click="quickPaste"><ClipboardPaste :size="20" /></button>
       <textarea ref="textarea" v-model="content" rows="1" placeholder="输入或粘贴内容…" @keydown.enter.exact.prevent="sendText" @paste="handlePaste" />
       <button class="send-button" :disabled="!content.trim() || sending" aria-label="发送"><Send :size="19" /></button>
-      <input ref="imageInput" class="visually-hidden" type="file" accept="image/*" multiple @change="selectFiles" /><input ref="fileInput" class="visually-hidden" type="file" multiple @change="selectFiles" />
+      <input ref="cameraInput" class="visually-hidden" type="file" accept="image/*" capture="environment" aria-label="相机拍照" @change="selectFiles" /><input ref="imageInput" class="visually-hidden" type="file" accept="image/*" multiple aria-label="选择图片文件" @change="selectFiles" /><input ref="fileInput" class="visually-hidden" type="file" multiple aria-label="选择任意文件" @change="selectFiles" />
     </form>
     <Teleport to="body"><Transition name="fade"><div v-if="dragActive" class="global-drop-overlay"><div><Images :size="38" /><strong>松开以上传</strong><span>文件将加入上传队列，最多同时传输 2 个</span></div></div></Transition></Teleport>
   </div>
