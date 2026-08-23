@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS devices(
 );
 CREATE TABLE IF NOT EXISTS sessions(
  id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,kind TEXT NOT NULL CHECK(kind IN ('temporary','device')),
- device_id TEXT REFERENCES devices(id),created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,revoked_at INTEGER
+ device_id TEXT REFERENCES devices(id),name TEXT,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,revoked_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS blobs(
  id TEXT PRIMARY KEY,sha256 TEXT NOT NULL UNIQUE,size INTEGER NOT NULL,path TEXT NOT NULL,mime TEXT NOT NULL,
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS blobs(
 CREATE TABLE IF NOT EXISTS messages(
  id TEXT PRIMARY KEY,type TEXT NOT NULL CHECK(type IN ('text','file')),content TEXT,file_name TEXT,mime TEXT,
  blob_id TEXT REFERENCES blobs(id),size INTEGER,sha256 TEXT,source_device_id TEXT REFERENCES devices(id),
+ source_session_id TEXT REFERENCES sessions(id),source_name TEXT,
  visibility TEXT NOT NULL DEFAULT 'normal' CHECK(visibility IN ('normal','trusted_only')),
  favorite INTEGER NOT NULL DEFAULT 0,pinned INTEGER NOT NULL DEFAULT 0,deleted_at INTEGER,created_at INTEGER NOT NULL,
  updated_at INTEGER NOT NULL,ocr_text TEXT NOT NULL DEFAULT '',ocr_status TEXT NOT NULL DEFAULT 'none',
@@ -55,9 +56,6 @@ CREATE TABLE IF NOT EXISTS message_history(
 CREATE TABLE IF NOT EXISTS message_downloads(
  message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,last_downloaded_at INTEGER NOT NULL,download_count INTEGER NOT NULL DEFAULT 1
 );
-CREATE TABLE IF NOT EXISTS text_templates(
- id TEXT PRIMARY KEY,name TEXT NOT NULL,content TEXT NOT NULL,tags TEXT NOT NULL DEFAULT '[]',created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL
-);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(deleted_at,pinned DESC,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_visibility ON messages(visibility,deleted_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash,expires_at);
@@ -68,6 +66,8 @@ INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(1,unixepoch()
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(2,unixepoch()*1000);
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(3,unixepoch()*1000);
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(4,unixepoch()*1000);
+DROP TABLE IF EXISTS text_templates;
+INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,unixepoch()*1000);
 `;
 
 export function openDatabase(config: AppConfig): AppDb {
@@ -77,6 +77,13 @@ export function openDatabase(config: AppConfig): AppDb {
   const db = new Database(config.dbPath);
   db.pragma('busy_timeout = 5000');
   db.exec(migration);
+  const hasColumn=(table:string,column:string)=>(db.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).some(item=>item.name===column);
+  if(!hasColumn('sessions','name'))db.exec('ALTER TABLE sessions ADD COLUMN name TEXT');
+  if(!hasColumn('messages','source_session_id'))db.exec('ALTER TABLE messages ADD COLUMN source_session_id TEXT REFERENCES sessions(id)');
+  if(!hasColumn('messages','source_name'))db.exec('ALTER TABLE messages ADD COLUMN source_name TEXT');
+  db.exec(`UPDATE sessions SET name=CASE WHEN kind='device' THEN COALESCE((SELECT name FROM devices WHERE devices.id=sessions.device_id),'长期设备') ELSE '临时设备' END WHERE name IS NULL OR trim(name)='';
+    UPDATE messages SET source_name=COALESCE((SELECT name FROM devices WHERE devices.id=messages.source_device_id),CASE WHEN source_device_id IS NULL THEN '临时设备' ELSE '长期设备' END) WHERE source_name IS NULL OR trim(source_name)='';
+    INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,unixepoch()*1000);`);
   return db;
 }
 

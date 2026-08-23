@@ -5,16 +5,16 @@ import { useRouter } from 'vue-router'
 import { api, errorText } from '../api'
 import { clearSession, state } from '../state'
 import type { Device, Settings } from '../types'
-import { formatBytes, formatTime, notify } from '../ui'
+import { formatBytes, formatTime, notify, requestConfirm } from '../ui'
 import BaseDialog from '../components/BaseDialog.vue'
 
 const router=useRouter(); const loading=ref(true); const error=ref(''); const settings=ref<Settings>({ocrEnabled:true}); const devices=ref<Device[]>([]); const passwordOpen=ref(false); const dangerOpen=ref(false); const currentAdmin=ref(''); const newMain=ref(''); const newAdmin=ref(''); const confirmPassword=ref(''); const revokeDevices=ref(false); const saving=ref(false); const theme=ref(localStorage.getItem('theme') ?? 'system')
 const ocr = computed(()=>settings.value.ocr ?? {completed:0,pending:0,processing:0,failed:0}); const storagePercent=computed(()=>settings.value.storage?.limit ? Math.min(100,((settings.value.storage.used??0)/settings.value.storage.limit)*100):0)
 async function load(){try{const [s,d]=await Promise.all([api.settings(),api.devices()]);settings.value=s;state.settings=s;devices.value=d.items}catch(e){error.value=errorText(e)}finally{loading.value=false}}
 async function save(patch:Partial<Settings>){try{settings.value=await api.updateSettings(patch);state.settings=settings.value;notify('设置已保存','success')}catch(e){notify(errorText(e),'error')}}
-async function reindex(scope:'failed'|'all'){if(scope==='all'&&!confirm('重新识别全部图片会在后台排队执行，继续？'))return;try{const r=await api.rerunOcr(scope);notify(`已加入 ${r.queued??0} 个识别任务`,'success');load()}catch(e){notify(errorText(e),'error')}}
+async function reindex(scope:'failed'|'all'){if(scope==='all'&&!await requestConfirm('全部图片会重新加入后台识别队列。',{title:'重新识别全部图片',confirmText:'开始识别'}))return;try{const r=await api.rerunOcr(scope);notify(`已加入 ${r.queued??0} 个识别任务`,'success');load()}catch(e){notify(errorText(e),'error')}}
 async function changePasswords(){if(newMain.value&&newMain.value!==confirmPassword.value){notify('新主口令两次输入不一致','error');return}saving.value=true;try{await api.updatePasswords({adminPassword:currentAdmin.value,newMainPassword:newMain.value||undefined,newAdminPassword:newAdmin.value||undefined,revokeDevices:revokeDevices.value});passwordOpen.value=false;notify('口令已修改','success');if(newAdmin.value||revokeDevices.value){clearSession();router.replace('/login')}}catch(e){notify(errorText(e),'error')}finally{saving.value=false}}
-async function revoke(device:Device){if(!confirm(`撤销“${device.name}”的长期权限？`))return;try{await api.revokeDevice(device.id);devices.value=devices.value.filter(d=>d.id!==device.id);if(device.current){clearSession();router.replace('/login')}}catch(e){notify(errorText(e),'error')}}
+async function revoke(device:Device){if(!await requestConfirm(`撤销“${device.name}”的长期权限？撤销后该设备需要重新登录。`,{title:'撤销长期设备',confirmText:'确认撤销',danger:true}))return;try{await api.revokeDevice(device.id);devices.value=devices.value.filter(d=>d.id!==device.id);if(device.current){clearSession();router.replace('/login')}}catch(e){notify(errorText(e),'error')}}
 async function emptyTrash(){try{await api.emptyTrash(currentAdmin.value);dangerOpen.value=false;currentAdmin.value='';notify('回收站已清空','success')}catch(e){notify(errorText(e),'error')}}
 function setTheme(value:string){theme.value=value;localStorage.setItem('theme',value);document.documentElement.dataset.theme=value==='system'?'':value}
 onMounted(load)

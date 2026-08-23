@@ -30,7 +30,7 @@ export async function hydrateAuth() {
 
 export function acceptTemporarySession(token: string) {
   setTemporaryToken(token)
-  state.principal = { sessionId: 'temporary', kind: 'temporary' }
+  state.principal = { sessionId: 'temporary', kind: 'temporary', name: '临时设备' }
 }
 
 export async function refreshPrincipal() {

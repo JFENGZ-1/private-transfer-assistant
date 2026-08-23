@@ -55,6 +55,7 @@ export const api = {
   promote: (adminPassword: string, name: string) => request<{ device: Device }>('/auth/promote', { method: 'POST', body: JSON.stringify({ adminPassword, name }) }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   logoutAll: (adminPassword: string) => request<{ ok: boolean }>('/auth/logout-all', { method: 'POST', body: JSON.stringify({ adminPassword }) }),
+  renameCurrent: (name: string) => request<{ name: string }>('/auth/name', { method: 'PATCH', body: JSON.stringify({ name }) }),
 
   messages: async (params: { cursor?: string; limit?: number; favorites?: boolean; pinned?: boolean; trash?: boolean } = {}) => {
     const data = await request<{ items: Message[]; nextCursor?: string }>(`/messages${queryString({ ...params, favorite: params.favorites, favorites: undefined })}`)
@@ -80,8 +81,9 @@ export const api = {
     if (targetDeviceIds?.length) form.append('targetDeviceIds', JSON.stringify(targetDeviceIds))
     xhr.send(form)
   }),
-  updateMessage: async (id: string, patch: Partial<Pick<Message, 'favorite' | 'pinned' | 'visibility' | 'tags' | 'note'>>) => normalizeMessage(await request<Message>(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })),
+  updateMessage: async (id: string, patch: Partial<Pick<Message, 'content' | 'favorite' | 'pinned' | 'visibility' | 'tags' | 'note'>>) => normalizeMessage(await request<Message>(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })),
   batchMessages: (ids: string[], action: 'delete' | 'restore' | 'favorite' | 'unfavorite' | 'pin' | 'unpin' | 'lock' | 'unlock') => request<{ updated: number }>('/messages/batch', { method: 'POST', body: JSON.stringify({ ids, action }) }),
+  mergeMessages: async (ids: string[]) => normalizeMessage(await request<Message>('/messages/merge', { method: 'POST', body: JSON.stringify({ ids }) })),
   removeMessage: (id: string, permanent = false) => request<{ ok: boolean }>(`/messages/${id}${queryString({ permanent })}`, { method: 'DELETE' }),
   restoreMessage: (id: string) => request<Message>(`/messages/${id}/restore`, { method: 'POST' }),
   downloadUrl: (id: string) => `${API_BASE}/messages/${encodeURIComponent(id)}/download`,
@@ -96,11 +98,12 @@ export const api = {
     anchor.click()
     anchor.remove()
   },
-  search: async (q: string, filters: SearchFilters) => {
-    const scope = [filters.text && 'text', filters.fileName && 'fileName', filters.imageText && 'ocr'].filter(Boolean).join(',')
-    const data = await request<{ items: Message[]; pendingOcr?: number }>(`/search${queryString({ q, images: filters.imageText, scope, type: filters.type, deviceId: filters.deviceId, from: filters.dateFrom ? new Date(filters.dateFrom).getTime() : undefined, to: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`).getTime() : undefined, favorite: filters.favorite || undefined, pinned: filters.pinned || undefined, privateOnly: filters.privateOnly || undefined })}`)
+  search: async (q: string, filters: SearchFilters, cursor?: number) => {
+    const scope = [filters.text && 'text', filters.fileName && 'fileName', filters.imageName !== false && 'imageName', filters.imageText && 'ocr'].filter(Boolean).join(',')
+    const data = await request<{ items: Message[]; pendingOcr?: number; nextCursor?: number | null }>(`/search${queryString({ q, images: filters.imageText, scope, type: filters.type, deviceId: filters.deviceId, sourceName: filters.sourceName, from: filters.dateFrom ? new Date(filters.dateFrom).getTime() : undefined, to: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`).getTime() : undefined, favorite: filters.favorite || undefined, pinned: filters.pinned || undefined, privateOnly: filters.privateOnly || undefined, cursor })}`)
     return { ...data, items: data.items.map(normalizeMessage) }
   },
+  searchFacets: () => request<{ sources: { name: string; count: number }[] }>('/search/facets'),
 
   devices: () => request<{ items: Device[] }>('/devices'),
   revokeDevice: (id: string) => request<{ ok: boolean }>(`/devices/${id}`, { method: 'DELETE' }),
@@ -170,7 +173,7 @@ export function errorText(error: unknown): string {
     invalid_password: '主口令不正确', invalid_admin_password: '管理口令不正确', invalid_code: '提取码不正确', code_required: '请输入提取码', unauthorized: '会话已失效，请重新进入',
     trusted_device_required: '此操作仅限长期设备', payload_too_large: '文件超过上传限制', storage_full: '服务器存储空间不足',
     share_expired: '分享已过期', share_revoked: '分享已撤销', download_limit_reached: '下载次数已用完', drop_expired: '投递箱已过期',
-    network_error: '网络连接失败', passwords_must_differ: '主口令与管理口令必须不同', csrf_rejected: '安全校验失败，请刷新页面后重试', request_failed: '请求失败'
+    network_error: '网络连接失败', passwords_must_differ: '主口令与管理口令必须不同', merge_requires_multiple: '请至少选择两条不同的消息', merge_text_only: '只能合并文本消息', merge_targeted_not_supported: '定向消息暂不支持合并', merged_content_too_large: '合并后的文本过长', csrf_rejected: '安全校验失败，请刷新页面后重试', request_failed: '请求失败'
   }
   return labels[code] ?? (error instanceof Error ? error.message : '未知错误')
 }

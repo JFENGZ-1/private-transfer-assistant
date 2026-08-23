@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, formatChatTimestamp, formatTime, shouldShowChatTimestamp } from './ui'
+import { confirmDialog, formatBytes, formatChatTimestamp, formatTime, requestConfirm, resolveConfirm, shouldShowChatTimestamp } from './ui'
 
 describe('ui formatters', () => {
   it('formats byte values for transfer cards', () => {
@@ -20,5 +20,21 @@ describe('ui formatters', () => {
     expect(shouldShowChatTimestamp(now)).toBe(true)
     expect(shouldShowChatTimestamp(now, now - 4 * 60 * 1000)).toBe(false)
     expect(shouldShowChatTimestamp(now, now - 5 * 60 * 1000)).toBe(true)
+  })
+
+  it('resolves the custom confirmation dialog without using browser confirm', async () => {
+    const result = requestConfirm('确认删除？', { title: '删除消息', confirmText: '删除', danger: true })
+    expect(confirmDialog).toMatchObject({ open: true, title: '删除消息', message: '确认删除？', confirmText: '删除', danger: true })
+    resolveConfirm(true)
+    await expect(result).resolves.toBe(true)
+    expect(confirmDialog.open).toBe(false)
+  })
+
+  it('cancels an earlier confirmation when a new one replaces it', async () => {
+    const earlier = requestConfirm('第一个')
+    const latest = requestConfirm('第二个')
+    await expect(earlier).resolves.toBe(false)
+    resolveConfirm(false)
+    await expect(latest).resolves.toBe(false)
   })
 })

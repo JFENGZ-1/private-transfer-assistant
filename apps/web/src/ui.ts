@@ -5,6 +5,37 @@ export const ui = reactive({
   toastKind: 'info' as 'info' | 'success' | 'error',
 })
 
+export const confirmDialog = reactive({
+  open: false,
+  title: '请确认',
+  message: '',
+  confirmText: '确认',
+  cancelText: '取消',
+  danger: false,
+})
+
+let confirmResolver: ((confirmed: boolean) => void) | undefined
+
+export function requestConfirm(message: string, options: { title?: string; confirmText?: string; cancelText?: string; danger?: boolean } = {}) {
+  confirmResolver?.(false)
+  Object.assign(confirmDialog, {
+    open: true,
+    title: options.title ?? '请确认',
+    message,
+    confirmText: options.confirmText ?? '确认',
+    cancelText: options.cancelText ?? '取消',
+    danger: options.danger ?? false,
+  })
+  return new Promise<boolean>(resolve => { confirmResolver = resolve })
+}
+
+export function resolveConfirm(confirmed: boolean) {
+  confirmDialog.open = false
+  const resolve = confirmResolver
+  confirmResolver = undefined
+  resolve?.(confirmed)
+}
+
 let timer = 0
 export function notify(message: string, kind: 'info' | 'success' | 'error' = 'info') {
   ui.toast = message

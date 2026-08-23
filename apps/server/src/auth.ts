@@ -38,10 +38,10 @@ function bearerOrProtocolToken(req:FastifyRequest):string|undefined{
 export function resolvePrincipal(app: FastifyInstance, req: FastifyRequest): Principal | undefined {
   const raw = bearerOrProtocolToken(req) ?? cookieToken(req);
   if (!raw) return;
-  const row = app.db.prepare(`SELECT id,kind,device_id FROM sessions WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?`).get(sha256(raw),now()) as {id:string;kind:'temporary'|'device';device_id?:string}|undefined;
+  const row = app.db.prepare(`SELECT s.id,s.kind,s.device_id,COALESCE(d.name,s.name,CASE WHEN s.kind='device' THEN '长期设备' ELSE '临时设备' END) AS name FROM sessions s LEFT JOIN devices d ON d.id=s.device_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?`).get(sha256(raw),now()) as {id:string;kind:'temporary'|'device';device_id?:string;name:string}|undefined;
   if (!row) return;
   if (row.device_id) app.db.prepare('UPDATE devices SET last_seen_at=?,last_ip=? WHERE id=? AND revoked_at IS NULL').run(now(),req.ip,row.device_id);
-  return { sessionId: row.id, kind: row.kind, deviceId: row.device_id };
+  return { sessionId: row.id, kind: row.kind, deviceId: row.device_id, name: row.name };
 }
 
 export function requireAuth(app: FastifyInstance, trusted = false) {
@@ -66,17 +66,18 @@ export async function authRoutes(app: FastifyInstance) {
     const {password}=z.object({password:z.string()}).parse(req.body);
     if (!await passwordVerify(setting(app.db,'main_password_hash'),password)) return reply.code(401).send({error:'invalid_password'});
     const token=newToken(), id=nanoid();
-    app.db.prepare('INSERT INTO sessions(id,token_hash,kind,created_at,expires_at) VALUES(?,?,?,?,?)').run(id,sha256(token),'temporary',now(),now()+app.config.tempSessionHours*3600000);
+    app.db.prepare('INSERT INTO sessions(id,token_hash,kind,device_id,name,created_at,expires_at,revoked_at) VALUES(?,?,?,?,?,?,?,NULL)').run(id,sha256(token),'temporary',null,'临时设备',now(),now()+app.config.tempSessionHours*3600000);
     return {token,expiresAt:now()+app.config.tempSessionHours*3600000};
   });
   app.post('/api/auth/promote',{preHandler:requireAuth(app),config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{
     const body=z.object({adminPassword:z.string(),name:z.string().trim().min(1).max(80).default('长期设备')}).parse(req.body);
     if(!await passwordVerify(setting(app.db,'admin_password_hash'),body.adminPassword)) return reply.code(401).send({error:'invalid_admin_password'});
     const deviceId=nanoid(),token=newToken(),sessionId=nanoid(),expires=now()+app.config.deviceDays*86400000;
-    const tx=app.db.transaction(()=>{app.db.prepare('INSERT INTO devices VALUES(?,?,?,?,?,?,?,NULL)').run(deviceId,body.name,sha256(token),now(),now(),req.ip,expires);app.db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?,?,NULL)').run(sessionId,sha256(token),'device',deviceId,now(),expires);});tx();
+    const tx=app.db.transaction(()=>{app.db.prepare('INSERT INTO devices(id,name,token_hash,created_at,last_seen_at,last_ip,expires_at,revoked_at) VALUES(?,?,?,?,?,?,?,NULL)').run(deviceId,body.name,sha256(token),now(),now(),req.ip,expires);app.db.prepare('INSERT INTO sessions(id,token_hash,kind,device_id,name,created_at,expires_at,revoked_at) VALUES(?,?,?,?,?,?,?,NULL)').run(sessionId,sha256(token),'device',deviceId,body.name,now(),expires);});tx();
     reply.setCookie(COOKIE,token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',expires:new Date(expires),signed:true});
     return {device:{id:deviceId,name:body.name,expiresAt:expires}};
   });
+  app.patch('/api/auth/name',{preHandler:requireAuth(app)},async req=>{const {name}=z.object({name:z.string().trim().min(1).max(80)}).parse(req.body),principal=req.principal!;app.db.transaction(()=>{app.db.prepare('UPDATE sessions SET name=? WHERE id=?').run(name,principal.sessionId);if(principal.deviceId){app.db.prepare('UPDATE devices SET name=? WHERE id=? AND revoked_at IS NULL').run(name,principal.deviceId);app.db.prepare('UPDATE sessions SET name=? WHERE device_id=?').run(name,principal.deviceId);app.db.prepare('UPDATE messages SET source_name=? WHERE source_device_id=?').run(name,principal.deviceId);}else app.db.prepare('UPDATE messages SET source_name=? WHERE source_session_id=?').run(name,principal.sessionId);})();app.broadcast({type:'source.renamed'});return {name};});
   app.post('/api/auth/logout',{preHandler:requireAuth(app)},async(req,reply)=>{app.db.prepare('UPDATE sessions SET revoked_at=? WHERE id=?').run(now(),req.principal!.sessionId);if(req.principal!.deviceId)app.db.prepare('UPDATE devices SET revoked_at=? WHERE id=?').run(now(),req.principal!.deviceId);reply.clearCookie(COOKIE,{path:'/'});return {ok:true};});
   app.post('/api/auth/logout-all',{preHandler:requireAuth(app,true),config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const {adminPassword}=z.object({adminPassword:z.string()}).parse(req.body);if(!await passwordVerify(setting(app.db,'admin_password_hash'),adminPassword))return reply.code(401).send({error:'invalid_admin_password'});app.db.prepare('UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL').run(now());app.db.prepare('UPDATE devices SET revoked_at=? WHERE revoked_at IS NULL').run(now());reply.clearCookie(COOKIE,{path:'/'});return {ok:true};});
   app.put('/api/settings/passwords',{preHandler:requireAuth(app,true),config:{rateLimit:{max:5,timeWindow:'1 minute'}}},async(req,reply)=>{const b=z.object({adminPassword:z.string(),newMainPassword:z.string().min(8).optional(),newAdminPassword:z.string().min(8).optional(),revokeDevices:z.boolean().default(false)}).parse(req.body);if(!await passwordVerify(setting(app.db,'admin_password_hash'),b.adminPassword))return reply.code(401).send({error:'invalid_admin_password'});if((b.newMainPassword&&await passwordVerify(setting(app.db,'admin_password_hash'),b.newMainPassword))||(b.newAdminPassword&&await passwordVerify(setting(app.db,'main_password_hash'),b.newAdminPassword))||(b.newMainPassword&&b.newAdminPassword&&b.newMainPassword===b.newAdminPassword))return reply.code(400).send({error:'passwords_must_differ'});if(b.newMainPassword)setSetting(app.db,'main_password_hash',await passwordHash(b.newMainPassword));if(b.newAdminPassword)setSetting(app.db,'admin_password_hash',await passwordHash(b.newAdminPassword));app.db.prepare("UPDATE sessions SET revoked_at=? WHERE kind='temporary' AND revoked_at IS NULL").run(now());if(b.newAdminPassword||b.revokeDevices){app.db.prepare("UPDATE sessions SET revoked_at=? WHERE kind='device' AND revoked_at IS NULL").run(now());app.db.prepare('UPDATE devices SET revoked_at=? WHERE revoked_at IS NULL').run(now());}return {ok:true};});

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
+import type { SearchFilters } from './types'
 
 const OriginalXHR = globalThis.XMLHttpRequest
 
@@ -73,5 +74,17 @@ describe('settings contract', () => {
 
     const init = fetchMock.mock.calls[0][1] as RequestInit
     expect(JSON.parse(String(init.body))).toEqual(patch)
+  })
+})
+
+describe('search scope compatibility', () => {
+  it('searches image names when an older open page has no imageName state', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const legacyFilters = { text: true, fileName: true, imageText: true, type: 'all', favorite: false, pinned: false, privateOnly: false } as unknown as SearchFilters
+
+    await api.search('微信图片_20260626030925_27_169.jpg', legacyFilters)
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('scope=text%2CfileName%2CimageName%2Cocr')
   })
 })

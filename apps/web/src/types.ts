@@ -1,4 +1,4 @@
-export type Principal = { sessionId: string; kind: 'temporary' | 'device'; deviceId?: string }
+export type Principal = { sessionId: string; kind: 'temporary' | 'device'; deviceId?: string; name: string }
 
 export type Device = {
   id: string
@@ -19,6 +19,7 @@ export type Message = {
   size?: number
   sha256?: string
   sourceDeviceId?: string
+  sourceSessionId?: string
   sourceDeviceName?: string
   targetDeviceIds?: string[]
   visibility: 'normal' | 'trusted_only'
@@ -32,6 +33,7 @@ export type Message = {
   tags?: string[]
   note?: string
   snippet?: string
+  matchScope?: 'text' | 'fileName' | 'imageName' | 'ocr'
   downloadUrl?: string
 }
 
@@ -85,9 +87,11 @@ export type UploadTask = {
 export type SearchFilters = {
   text: boolean
   fileName: boolean
+  imageName: boolean
   imageText: boolean
-  type: 'all' | 'image' | 'document' | 'archive' | 'other'
+  type: 'all' | 'text' | 'file' | 'image' | 'video' | 'media' | 'audio' | 'link' | 'document' | 'archive' | 'other'
   deviceId?: string
+  sourceName?: string
   dateFrom?: string
   dateTo?: string
   favorite: boolean

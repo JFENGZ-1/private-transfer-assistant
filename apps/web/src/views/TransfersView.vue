@@ -4,14 +4,14 @@ import { Ban, Clock3, Copy, Download, Inbox, Link2, Plus, SendToBack, ShieldAler
 import { api, errorText } from '../api'
 import { isTrusted } from '../state'
 import type { Drop, Share } from '../types'
-import { copyText, formatBytes, formatTime, notify } from '../ui'
+import { copyText, formatBytes, formatTime, notify, requestConfirm } from '../ui'
 import BaseDialog from '../components/BaseDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const tab = ref<'shares'|'drops'>('shares'); const shares = ref<Share[]>([]); const drops = ref<Drop[]>([]); const loading = ref(true); const error = ref(''); const dropOpen = ref(false); const name = ref('给我投递文件'); const expiresIn = ref(86400); const maxUploads = ref<number|null>(5); const maxFileSizeMb = ref(500)
 async function load() { loading.value = true; try { if (isTrusted.value) { shares.value = (await api.shares()).items; drops.value = (await api.drops()).items } } catch(e) { error.value = errorText(e) } finally { loading.value = false } }
-async function revokeShare(id:string) { if (!confirm('撤销后链接将立即失效，继续？')) return; await api.revokeShare(id); shares.value = shares.value.filter(v=>v.id!==id) }
-async function revokeDrop(id:string) { if (!confirm('关闭后将无法继续投递，继续？')) return; await api.revokeDrop(id); drops.value = drops.value.filter(v=>v.id!==id) }
+async function revokeShare(id:string) { if (!await requestConfirm('撤销后链接将立即失效。',{title:'撤销临时分享',confirmText:'确认撤销',danger:true})) return; await api.revokeShare(id); shares.value = shares.value.filter(v=>v.id!==id) }
+async function revokeDrop(id:string) { if (!await requestConfirm('关闭后将无法继续通过此链接投递。',{title:'关闭投递箱',confirmText:'确认关闭',danger:true})) return; await api.revokeDrop(id); drops.value = drops.value.filter(v=>v.id!==id) }
 async function createDrop() { try { const drop = await api.createDrop({ name:name.value, expiresIn:expiresIn.value, maxUploads:maxUploads.value, maxFileSize:maxFileSizeMb.value*1024*1024 }); drops.value.unshift(drop); dropOpen.value=false; notify('投递链接已创建','success') } catch(e){notify(errorText(e),'error')} }
 function shareLink(item: Share) { return item.url ?? `${location.origin}/s/${item.token}` } function dropLink(item: Drop) { return item.url ?? `${location.origin}/drop/${item.token}` }
 onMounted(load)

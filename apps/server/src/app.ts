@@ -15,7 +15,6 @@ import { searchRoutes } from './search.js';
 import { sharingRoutes } from './sharing.js';
 import { adminRoutes } from './admin.js';
 import { realtimeRoutes } from './realtime.js';
-import { templateRoutes } from './templates.js';
 import { startCleanup } from './cleanup.js';
 import './types.js';
 
@@ -38,7 +37,7 @@ export async function buildApp(overrides:Partial<AppConfig>={}){
   await app.register(websocket);
   try{await initializePasswords(app);}catch(error){await app.close();throw error;}
   app.get('/health',async()=>({ok:true}));
-  await realtimeRoutes(app);await authRoutes(app);await messageRoutes(app);await fileRoutes(app);await searchRoutes(app);await sharingRoutes(app);await adminRoutes(app);await templateRoutes(app);
+  await realtimeRoutes(app);await authRoutes(app);await messageRoutes(app);await fileRoutes(app);await searchRoutes(app);await sharingRoutes(app);await adminRoutes(app);
   if(process.env.NODE_ENV==='production'){
     await app.register(staticPlugin,{root:config.webDistDir,prefix:'/'});
     app.setNotFoundHandler((req,reply)=>{
