@@ -70,7 +70,37 @@ nginx -v
 
 宝塔“安全”页面同样放行 80、443，并保留实际 SSH、宝塔端口。不要在系统防火墙开放 3000。
 
-## 3. 上传项目
+## 3. 一键安装或手动上传
+
+### 3.1 一键安装（推荐）
+
+先创建阿里云 ECS 快照，再通过宝塔终端或 SSH 以 `root` 执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh | bash
+```
+
+[一键引导脚本](./scripts/bootstrap-baota-native.sh)只负责：
+
+1. 检查 `root`、`curl` 和 `tar`。
+2. 从 GitHub 下载本仓库当前 `main` 源码到一次性临时目录。
+3. 校验压缩包能够被完整解开并检查关键项目文件。
+4. 将终端重新连接给正式安装程序，以便隐藏输入域名和两个口令。
+5. 安装结束后删除临时源码；正式 release 和数据不会被删除。
+
+因此它最终执行的仍是本指南介绍的 `scripts/install-baota-native.sh`，OCR 自检、服务限制、数据目录及重复安装逻辑完全相同。
+
+如果不希望把网络脚本直接交给 Bash，可先下载、查看再执行：
+
+```bash
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+less /root/bootstrap-baota-native.sh
+bash /root/bootstrap-baota-native.sh
+```
+
+一键安装会继续执行第 4 节中的交互安装。完成后直接前往第 5 节配置宝塔站点，不需要保留下载的临时源码。
+
+### 3.2 手动上传项目
 
 将完整项目上传到服务器，例如：
 
@@ -86,6 +116,13 @@ git clone 你的仓库地址 private-transfer-assistant-source
 cd private-transfer-assistant-source
 ```
 
+本项目公开仓库可直接使用：
+
+```bash
+git clone https://github.com/JFENGZ-1/private-transfer-assistant.git private-transfer-assistant-source
+cd private-transfer-assistant-source
+```
+
 请使用包含 `scripts/install-baota-native.sh` 的当前源码。最初的 `v1.0.0` 代码标签早于部署脚本，单独切回该旧标签不会包含本安装工具。
 
 确认安装文件：
@@ -98,6 +135,8 @@ ls package.json package-lock.json scripts/install-baota-native.sh ocr/worker.py
 源码目录只是安装源。正式程序会部署到 `/opt/private-transfer-assistant`，数据位于 `/var/lib/private-transfer-assistant`。
 
 ## 4. 执行自动安装
+
+使用第 3.1 节一键命令时，本节会由引导脚本自动执行；手动上传源码时再运行下面的命令。
 
 使用 root 运行：
 

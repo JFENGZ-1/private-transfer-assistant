@@ -4,6 +4,44 @@
 
 生产环境请参阅 [Docker + Caddy 部署指南](./DEPLOYMENT.md)；已有宝塔 LNMP 的服务器请使用 [宝塔 LNMP 部署指南](./DEPLOYMENT-BAOTA-LNMP.md)。
 
+## 宝塔原生一键安装
+
+适用于已经安装宝塔面板和 Nginx 的 64 位 Linux，也包含阿里云 CentOS 8.2 遗留兼容流程。先创建 ECS 快照、解析好域名，并建议为 2 GB 内存服务器配置 1–2 GB swap。然后在宝塔终端或 SSH 中以 `root` 执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh | bash
+```
+
+引导脚本会从本仓库下载当前 `main` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
+
+1. 已解析到服务器的域名，不带 `https://`。
+2. 主口令，至少 8 位，并再次确认。
+3. 管理口令，至少 8 位、不能与主口令相同，并再次确认。
+
+输入口令时终端不会显示字符。CentOS 8.2 会先切换阿里云/CentOS 8.5.2111 归档源，再独立编译 Python 3.11；不会替换宝塔或系统 Python。脚本完成 Node.js 构建、46 项测试、OCR 依赖安装和真实图片识别后，必须看到：
+
+```text
+OCR inference OK: OCR TEST 123456
+安装完成
+```
+
+安装后在宝塔创建纯静态站点并申请 SSL，将反向代理目标设为 `http://127.0.0.1:3000`。脚本生成的完整 Nginx 片段位于：
+
+```text
+/opt/private-transfer-assistant/nginx/location.conf
+/opt/private-transfer-assistant/nginx/server-directives.conf
+```
+
+阿里云安全组只需向公网开放 80、443；SSH 和宝塔端口应限制为自己的 IP，**不要开放 3000**。完整步骤、升级、备份和故障排查见 [宝塔 LNMP 部署指南](./DEPLOYMENT-BAOTA-LNMP.md)。
+
+不希望直接执行网络脚本时，可先下载并检查：
+
+```bash
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+less /root/bootstrap-baota-native.sh
+bash /root/bootstrap-baota-native.sh
+```
+
 ## 功能
 
 - 聊天式发送文本、图片和任意文件，支持上传进度与跨设备实时同步
@@ -18,7 +56,7 @@
 
 新消息系统通知暂未启用，页面内实时同步不受影响。
 
-## 服务器要求
+## 服务器要求（Docker 方案）
 
 - 2 核 CPU、2 GB 内存，建议额外配置 1–2 GB swap
 - 64 位 Linux 与 Docker Engine / Docker Compose v2
@@ -28,7 +66,7 @@
 
 OCR 使用 RapidOCR 的 PaddleOCR 系轻量模型与 ONNX Runtime。它只在上传后异步建立索引，搜索请求不会即时运行 OCR。默认只有一个任务和一个推理线程，连续空闲 5 分钟后释放模型内存。
 
-## 首次部署
+## 首次部署（Docker）
 
 ```bash
 cp .env.example .env
