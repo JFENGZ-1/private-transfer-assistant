@@ -29,7 +29,7 @@ function choose(event: Event) {
   files.value = [...((event.target as HTMLInputElement).files ?? [])];
 }
 async function submit() {
-  if (!files.value.length) return;
+  if (!files.value.length && !note.value.trim()) return;
   loading.value = true;
   progress.value = 0;
   currentFile.value = 0;
@@ -47,6 +47,7 @@ async function submit() {
     );
     receipt.value = r.receipt ?? "已送达";
     files.value = [];
+    note.value = "";
   } catch (e) {
     error.value = `${currentFile.value ? `前 ${currentFile.value} 个文件已送达，` : ""}${errorText(e)}`;
   } finally {
@@ -78,15 +79,16 @@ async function submit() {
             ><input v-model="sender" placeholder="便于收件人识别"
           /></label>
           <label class="field"
-            ><span>留言（可选）</span
+            ><span>文本内容（可单独投递）</span
             ><textarea
               v-model="note"
               rows="3"
-              placeholder="说明这些文件的用途"
+              maxlength="1000000"
+              placeholder="不选择文件时，可直接发送这段文本"
             />
           </label>
           <label class="drop-zone"
-            ><FileUp :size="27" /><strong>选择要投递的文件</strong
+            ><FileUp :size="27" /><strong>选择要投递的文件（可选）</strong
             ><span v-if="drop.maxFileSize"
               >单文件最大 {{ formatBytes(drop.maxFileSize) }}</span
             ><input
@@ -115,12 +117,16 @@ async function submit() {
           <p v-if="error" class="form-error">{{ error }}</p>
           <button
             class="primary-button full"
-            :disabled="!files.length || loading"
+            :disabled="(!files.length && !note.trim()) || loading"
           >
             {{
               loading
-                ? `正在投递 ${currentFile + 1}/${files.length} · ${Math.round(progress * 100)}%`
-                : "确认投递"
+                ? files.length
+                  ? `正在投递 ${currentFile + 1}/${files.length} · ${Math.round(progress * 100)}%`
+                  : "正在投递文本…"
+                : files.length
+                  ? "确认投递"
+                  : "发送文本"
             }}
           </button>
         </form>

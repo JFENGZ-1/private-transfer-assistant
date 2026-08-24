@@ -6,7 +6,7 @@ import { requireAuth } from './auth.js';
 import { newToken, passwordHash, passwordVerify, sha256 } from './security.js';
 import { markMessageDownloaded, saveUpload } from './files.js';
 import { visibleMessage } from './messages.js';
-import { setting } from './db.js';
+import { indexMessage, setting } from './db.js';
 import { attachmentDisposition, streamInlinePreview } from './preview.js';
 
 const now=()=>Date.now();
@@ -57,6 +57,7 @@ export async function sharingRoutes(app:FastifyInstance){
   app.post('/api/drops/:id/link',{preHandler:requireAuth(app,true)},async(req,reply)=>{const {id}=z.object({id:z.string()}).parse(req.params),drop=app.db.prepare('SELECT token_value AS token FROM drops WHERE id=? AND revoked_at IS NULL').get(id) as {token?:string}|undefined;if(!drop)return reply.code(404).send({error:'not_found'});if(drop.token)return {token:drop.token,regenerated:false};const token=newToken();app.db.prepare('UPDATE drops SET token_hash=?,token_value=? WHERE id=?').run(sha256(token),token,id);return {token,regenerated:true};});
   app.delete('/api/drops/:id',{preHandler:requireAuth(app,true)},async req=>{const {id}=z.object({id:z.string()}).parse(req.params);app.db.prepare('UPDATE drops SET revoked_at=? WHERE id=?').run(now(),id);return {ok:true};});
   app.get('/api/public/drops/:token',async(req,reply)=>{const {token}=z.object({token:z.string()}).parse(req.params),drop=app.db.prepare('SELECT name,expires_at AS expiresAt,max_file_size AS maxFileSize,allowed_types AS allowedTypes FROM drops WHERE token_hash=? AND revoked_at IS NULL AND expires_at>? AND (max_uploads IS NULL OR uploads<max_uploads)').get(sha256(token),now()) as {allowedTypes:string}|undefined;return drop?{drop:normalizeDrop(drop)}:reply.code(404).send({error:'not_found'});});
+  app.post('/api/public/drops/:token/text',async(req,reply)=>{const {token}=z.object({token:z.string()}).parse(req.params),body=z.object({content:z.string().trim().min(1).max(1_000_000),name:z.string().trim().max(80).optional()}).parse(req.body),drop=reserveDrop(app,token);if(!drop)return reply.code(404).send({error:'not_found'});try{const id=nanoid(),ts=now(),sourceName=body.name||'外部投递';app.db.prepare(`INSERT INTO messages(id,type,content,source_device_id,source_session_id,source_name,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(id,'text',body.content,null,null,sourceName,'normal',ts,ts);indexMessage(app.db,id);const item=visibleMessage(app,id,true)!;app.broadcast({type:'message.created',message:item});return reply.code(201).send({ok:true,messageId:id,receipt:id});}catch(error){app.db.prepare('UPDATE drops SET uploads=MAX(uploads-1,0) WHERE id=?').run(drop.id);throw error;}});
   const receiveDrop=async(req:any,reply:any)=>{const {token}=z.object({token:z.string()}).parse(req.params);const d=reserveDrop(app,token);if(!d)return reply.code(404).send({error:'not_found'});try{const item=await saveUpload(app,req,false,d.id);app.broadcast({type:'message.created',message:item});return reply.code(201).send({ok:true,messageId:item.id});}catch(error){app.db.prepare('UPDATE drops SET uploads=MAX(uploads-1,0) WHERE id=?').run(d.id);throw error;}};
   app.post('/api/public/drops/:token/upload',receiveDrop);
   app.post('/api/public/drops/:token',receiveDrop);
