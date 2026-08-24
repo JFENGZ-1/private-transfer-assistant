@@ -2,7 +2,7 @@
 
 一个面向个人自托管的跨设备文件传输与粘贴板。手机和电脑不必位于同一局域网；输入主口令可临时访问，使用独立管理口令可把浏览器授权为长期设备。
 
-生产环境请参阅 [Docker + Caddy 部署指南](./DEPLOYMENT.md)；已有宝塔 LNMP 的服务器请使用 [宝塔 LNMP 部署指南](./DEPLOYMENT-BAOTA-LNMP.md)。
+当前稳定版本为 **v1.3.0**。生产环境优先使用已经实际验证的 [宝塔 LNMP 原生部署方案](./DEPLOYMENT-BAOTA-LNMP.md)；Docker + Caddy 方案仍处于未验证状态，参见 [Docker 部署指南](./DEPLOYMENT.md)。
 
 ## 宝塔原生一键安装
 
@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant
 2. 主口令，至少 8 位，并再次确认。
 3. 管理口令，至少 8 位、不能与主口令相同，并再次确认。
 
-输入口令时终端不会显示字符。CentOS 8.2 会先切换阿里云/CentOS 8.5.2111 归档源，再独立编译 Python 3.11；不会替换宝塔或系统 Python。脚本完成 Node.js 构建、46 项测试、OCR 依赖安装和真实图片识别后，必须看到：
+输入口令时终端不会显示字符。CentOS 8.2 会先切换阿里云/CentOS 8.5.2111 归档源，再独立编译 Python 3.11；不会替换宝塔或系统 Python。脚本完成依赖安装、完整测试、生产构建和真实 OCR 图片识别后，必须看到：
 
 ```text
 OCR inference OK: OCR TEST 123456
@@ -42,17 +42,62 @@ less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
 
+## 宝塔原生一键升级
+
+适用于已经通过上述脚本部署、且存在 `/etc/private-transfer-assistant.env` 的服务器。升级会复用现有域名、端口、Cookie 密钥和运行参数，不会要求重新输入主口令或管理口令，也不会删除数据库和上传文件。
+
+升级前建议先在阿里云控制台创建 ECS 快照。也可以在服务器中额外生成一份一致性备份：
+
+```bash
+systemctl stop private-transfer-assistant private-transfer-assistant-ocr
+
+tar -czf /root/private-transfer-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
+  /var/lib/private-transfer-assistant \
+  /etc/private-transfer-assistant.env
+
+systemctl start private-transfer-assistant private-transfer-assistant-ocr
+```
+
+然后在宝塔终端或 SSH 中以 `root` 执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh | bash
+```
+
+脚本会下载当前 `main` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。
+
+出现“安装完成”后执行：
+
+```bash
+grep '"version"' /opt/private-transfer-assistant/current/package.json | head -1
+systemctl is-active private-transfer-assistant
+systemctl is-active private-transfer-assistant-ocr
+curl -s http://127.0.0.1:3000/api/auth/status
+```
+
+v1.3.0 正常结果应包含 `"version": "1.3.0"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
+
+```bash
+journalctl -u private-transfer-assistant -n 100 --no-pager
+journalctl -u private-transfer-assistant-ocr -n 100 --no-pager
+```
+
+升级完成后，手机浏览器或已安装的 PWA 如仍显示旧界面，请彻底关闭后重新打开。不要手动删除 `/var/lib/private-transfer-assistant`、`/etc/private-transfer-assistant.env` 或当前 release 目录。
+
 ## 功能
 
-- 聊天式发送文本、图片和任意文件，支持上传进度与跨设备实时同步
+- 聊天式发送文本、图片、视频和任意文件，支持来源设备名称、上传进度与跨设备实时同步
 - 主口令临时会话：凭证只保存在当前页面内存，刷新或关闭后退出
 - 管理口令授权长期设备，设置页仅长期设备可访问
 - 隐私锁：锁定消息只对长期设备可见，包含搜索、缩略图和下载权限
-- 文本、文件名及图片 OCR 内容搜索；搜索面板可单独关闭图片搜索
-- 收藏、置顶、标签、备注、回收站、批量操作和指定设备投递
-- 单条消息临时分享，以及只允许外部上传的投递链接
-- PWA 安装与系统分享目标
-- SQLite、本地文件卷、自动 HTTPS，适合 2 核 2 GB 的小型服务器
+- 文本、链接、文件名、图片原始名称及 OCR 内容搜索，支持按图片与视频、文件、音频等分类快速浏览
+- 收藏、置顶、标签、备注、消息合并、自由复制与编辑、回收站恢复和批量操作
+- 单条或多条文本与文件共用一个临时分享链接，支持永久有效期、下载次数、二维码和参数编辑
+- 外部投递链接支持快速创建、参数编辑、链接再次显示和二维码
+- 图片、视频、音频、PDF 与隔离 HTML 的统一预览，其他文件保持原始下载
+- OCR 后台队列、识别结果查看、重新识别和真实图片状态测试
+- PWA 安装与系统分享目标，支持更换应用图标、站点标题和浏览器标签标题
+- SQLite 与本地文件存储，宝塔 Nginx 负责 HTTPS，适合 2 核 2 GB 的小型服务器
 
 新消息系统通知暂未启用，页面内实时同步不受影响。
 
@@ -66,7 +111,7 @@ bash /root/bootstrap-baota-native.sh
 
 OCR 使用 RapidOCR 的 PaddleOCR 系轻量模型与 ONNX Runtime。它只在上传后异步建立索引，搜索请求不会即时运行 OCR。默认只有一个任务和一个推理线程，连续空闲 5 分钟后释放模型内存。
 
-## 首次部署（Docker）未测试
+## 首次部署（Docker，未测试）
 
 ```bash
 cp .env.example .env
@@ -204,3 +249,4 @@ docker compose down
 | 宿主机备份 | `./backups` |
 
 应用也兼容 `DATA_DIR`、`DB_PATH`、`FILES_DIR`、`UPLOAD_DIR`、`TEMP_DIR` 的自定义部署；Compose 已把 `FILES_DIR` 与 `UPLOAD_DIR` 指向同一目录。
+
