@@ -97,7 +97,7 @@ export const api = {
   mergeMessages: async (ids: string[]) => normalizeMessage(await request<Message>('/messages/merge', { method: 'POST', body: JSON.stringify({ ids }) })),
   removeMessage: (id: string, permanent = false) => request<{ ok: boolean }>(`/messages/${id}${queryString({ permanent })}`, { method: 'DELETE' }),
   restoreMessage: (id: string) => request<Message>(`/messages/${id}/restore`, { method: 'POST' }),
-  downloadUrl: (id: string) => `${API_BASE}/messages/${encodeURIComponent(id)}/download`,
+  downloadUrl: (id: string, fileName?: string) => `${API_BASE}/messages/${encodeURIComponent(id)}/download${fileName ? `/${encodeURIComponent(fileName)}` : ''}`,
   downloadTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' }),
   previewTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/preview-token`, { method: 'POST' }),
   downloadMessage: async (id: string, fileName?: string) => {
@@ -126,9 +126,9 @@ export const api = {
     const messages=(data.messages??[data.message]).map(normalizeMessage)
     return { share: data.share, message: messages[0], messages }
   },
-  publicShareDownloadUrl: (token: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/download${queryString({ code })}`,
+  publicShareDownloadUrl: (token: string, fileName?: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/download${fileName ? `/${encodeURIComponent(fileName)}` : ''}${queryString({ code })}`,
   publicSharePreviewUrl: (token: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/preview${queryString({ code })}`,
-  publicShareItemDownloadUrl: (token: string, messageId: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/items/${encodeURIComponent(messageId)}/download${queryString({ code })}`,
+  publicShareItemDownloadUrl: (token: string, messageId: string, fileName?: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/items/${encodeURIComponent(messageId)}/download${fileName ? `/${encodeURIComponent(fileName)}` : ''}${queryString({ code })}`,
   publicShareItemPreviewUrl: (token: string, messageId: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/items/${encodeURIComponent(messageId)}/preview${queryString({ code })}`,
 
   drops: () => request<{ items: Drop[] }>('/drops'),

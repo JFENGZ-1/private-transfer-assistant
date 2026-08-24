@@ -43,6 +43,7 @@ function downloadUrl(message: Message) {
   return api.publicShareItemDownloadUrl(
     String(route.params.token),
     message.id,
+    message.fileName,
     code.value || undefined,
   );
 }

@@ -77,6 +77,11 @@ describe('public drop uploads', () => {
 })
 
 describe('authenticated downloads', () => {
+  it('keeps the original extension in authenticated and public download paths', () => {
+    expect(api.downloadUrl('message/1', '工作 计划.xlsx')).toBe('/api/messages/message%2F1/download/%E5%B7%A5%E4%BD%9C%20%E8%AE%A1%E5%88%92.xlsx')
+    expect(api.publicShareItemDownloadUrl('share-token', 'message-1', '资料.docx', '1234')).toBe('/api/public/shares/share-token/items/message-1/download/%E8%B5%84%E6%96%99.docx?code=1234')
+  })
+
   it('requests a short-lived ticket and triggers a native file link without buffering the file', async () => {
     const link={href:'',download:'',rel:'',style:{display:''},click:vi.fn(),remove:vi.fn()}
     const append=vi.fn()
