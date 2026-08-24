@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS messages(
 CREATE TABLE IF NOT EXISTS message_targets(message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,device_id TEXT NOT NULL REFERENCES devices(id),PRIMARY KEY(message_id,device_id));
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(message_id UNINDEXED,content,file_name,ocr_text,note,tags,tokenize='unicode61');
 CREATE TABLE IF NOT EXISTS shares(
- id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,message_id TEXT NOT NULL REFERENCES messages(id),code_hash TEXT,
+ id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,token_value TEXT,message_id TEXT NOT NULL REFERENCES messages(id),code_hash TEXT,
  expires_at INTEGER NOT NULL,max_downloads INTEGER,downloads INTEGER NOT NULL DEFAULT 0,revoked_at INTEGER,created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS share_messages(
@@ -91,6 +91,7 @@ export function openDatabase(config: AppConfig): AppDb {
   if(!hasColumn('sessions','name'))db.exec('ALTER TABLE sessions ADD COLUMN name TEXT');
   if(!hasColumn('messages','source_session_id'))db.exec('ALTER TABLE messages ADD COLUMN source_session_id TEXT REFERENCES sessions(id)');
   if(!hasColumn('messages','source_name'))db.exec('ALTER TABLE messages ADD COLUMN source_name TEXT');
+  if(!hasColumn('shares','token_value'))db.exec('ALTER TABLE shares ADD COLUMN token_value TEXT');
   if(!hasColumn('drops','token_value'))db.exec('ALTER TABLE drops ADD COLUMN token_value TEXT');
   db.exec(`UPDATE sessions SET name=CASE WHEN kind='device' THEN COALESCE((SELECT name FROM devices WHERE devices.id=sessions.device_id),'长期设备') ELSE '临时设备' END WHERE name IS NULL OR trim(name)='';
     UPDATE messages SET source_name=COALESCE((SELECT name FROM devices WHERE devices.id=messages.source_device_id),CASE WHEN source_device_id IS NULL THEN '临时设备' ELSE '长期设备' END) WHERE source_name IS NULL OR trim(source_name)='';
@@ -105,6 +106,7 @@ export function openDatabase(config: AppConfig): AppDb {
   })();
   db.prepare('INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(7,?)').run(Date.now());
   db.prepare('INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(8,?)').run(Date.now());
+  db.prepare('INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(9,?)').run(Date.now());
   return db;
 }
 

@@ -114,6 +114,7 @@ export const api = {
   createShare: (messageId: string, values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageId, ...values }) }),
   createMultiShare: (messageIds: string[], values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageIds, ...values }) }),
   updateShare: (id: string, values: { expiresIn?: number | null; maxDownloads?: number | null }) => request<Share>(`/shares/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(values) }),
+  revealShareLink: (id: string) => request<{ token: string; regenerated: boolean }>(`/shares/${encodeURIComponent(id)}/link`, { method: 'POST' }),
   revokeShare: (id: string) => request<{ ok: boolean }>(`/shares/${id}`, { method: 'DELETE' }),
   publicShare: async (token: string, code?: string) => {
     const data = await request<{ share?: Share; message: Message; messages?: Message[] }>(`/public/shares/${encodeURIComponent(token)}${queryString({ code })}`)
