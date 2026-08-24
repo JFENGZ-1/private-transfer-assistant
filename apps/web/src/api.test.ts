@@ -77,16 +77,21 @@ describe('public drop uploads', () => {
 })
 
 describe('authenticated downloads', () => {
-  it('requests a short-lived ticket and navigates without buffering the file', async () => {
-    const assign = vi.fn()
+  it('requests a short-lived ticket and triggers a native file link without buffering the file', async () => {
+    const link={href:'',download:'',rel:'',style:{display:''},click:vi.fn(),remove:vi.fn()}
+    const append=vi.fn()
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ token: 'ticket', expiresAt: Date.now() + 60_000, url: '/api/downloads/ticket' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('location', { origin: 'https://transfer.test', assign })
+    vi.stubGlobal('location', { origin: 'https://transfer.test' })
+    vi.stubGlobal('document',{createElement:vi.fn(()=>link),body:{append}})
 
     await api.downloadMessage('message-1', 'large.iso')
 
     expect(fetchMock).toHaveBeenCalledWith('/api/messages/message-1/download-token', expect.objectContaining({ method: 'POST' }))
-    expect(assign).toHaveBeenCalledWith('https://transfer.test/api/downloads/ticket')
+    expect(append).toHaveBeenCalledWith(link)
+    expect(link.click).toHaveBeenCalledOnce()
+    expect(link.remove).toHaveBeenCalledOnce()
+    expect(link).toMatchObject({href:'https://transfer.test/api/downloads/ticket',download:'large.iso',rel:'noopener'})
   })
 })
 
