@@ -44,6 +44,23 @@ describe('public drop uploads', () => {
     expect(result.receipts).toEqual(['m-a.txt', 'm-b.txt'])
     expect(progress).toHaveBeenLastCalledWith(1, 1)
   })
+
+  it('updates drop parameters and requests a managed link', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'drop-1', name: '编辑后', token: 'saved-token' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'saved-token', regenerated: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.updateDrop('drop-1', { name: '编辑后', expiresIn: 604800, maxUploads: null, maxFileSize: 104857600, allowedTypes: ['image/*'] })
+    const updateInit = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/drops/drop-1')
+    expect(updateInit.method).toBe('PATCH')
+    expect(JSON.parse(String(updateInit.body))).toEqual({ name: '编辑后', expiresIn: 604800, maxUploads: null, maxFileSize: 104857600, allowedTypes: ['image/*'] })
+
+    expect(await api.revealDropLink('drop-1')).toEqual({ token: 'saved-token', regenerated: false })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/drops/drop-1/link')
+    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe('POST')
+  })
 })
 
 describe('authenticated downloads', () => {
@@ -86,5 +103,23 @@ describe('search scope compatibility', () => {
     await api.search('微信图片_20260626030925_27_169.jpg', legacyFilters)
 
     expect(String(fetchMock.mock.calls[0][0])).toContain('scope=text%2CfileName%2CimageName%2Cocr')
+  })
+})
+
+describe('multi-message shares', () => {
+  it('sends all selected ids and normalizes every public item', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'share-1', token: 'token', itemCount: 2, expiresAt: 0, downloads: 0 }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ share: { expiresAt: 0, downloads: 0, itemCount: 2 }, message: { id: 'm1', type: 'text', content: 'a' }, messages: [{ id: 'm1', type: 'text', content: 'a', favorite: 0, pinned: 0 }, { id: 'm2', type: 'file', fileName: 'b.pdf', favorite: 1, pinned: 0 }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.createMultiShare(['m1', 'm2'], { expiresIn: null, maxDownloads: 5 })
+    const createdInit = fetchMock.mock.calls[0][1] as RequestInit
+    expect(JSON.parse(String(createdInit.body))).toEqual({ messageIds: ['m1', 'm2'], expiresIn: null, maxDownloads: 5 })
+
+    const opened = await api.publicShare('token')
+    expect(opened.messages).toHaveLength(2)
+    expect(opened.messages[1]).toMatchObject({ id: 'm2', favorite: true, pinned: false })
+    expect(api.publicShareItemPreviewUrl('token', 'm2')).toContain('/public/shares/token/items/m2/preview')
   })
 })

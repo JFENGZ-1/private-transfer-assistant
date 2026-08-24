@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Combine, Heart, Layers3, Search, Tag, X } from 'lucide-vue-next'
+import { Combine, Heart, Layers3, Lock, Search, Share2, Tag, Unlock, X } from 'lucide-vue-next'
 import { api, errorText } from '../api'
+import { isTrusted } from '../state'
 import type { Message } from '../types'
 import { notify, requestConfirm } from '../ui'
 import EmptyState from '../components/EmptyState.vue'
 import MessageCard from '../components/MessageCard.vue'
+import BatchShareDialog from '../components/BatchShareDialog.vue'
 
-const items = ref<Message[]>([]); const loading = ref(true); const error = ref(''); const query = ref(''); const activeTag = ref(''); const selecting = ref(false); const selected = ref<string[]>([])
+const items = ref<Message[]>([]); const loading = ref(true); const error = ref(''); const query = ref(''); const activeTag = ref(''); const selecting = ref(false); const selected = ref<string[]>([]);const shareOpen=ref(false)
 const tags = computed(() => [...new Set(items.value.flatMap(m => m.tags ?? []))])
 const filtered = computed(() => items.value.filter(m => (!query.value || `${m.content} ${m.fileName} ${m.note}`.toLowerCase().includes(query.value.toLowerCase())) && (!activeTag.value || m.tags?.includes(activeTag.value))))
+const selectedItems=computed(()=>items.value.filter(message=>selected.value.includes(message.id)))
+const allSelectedPrivate=computed(()=>Boolean(selectedItems.value.length)&&selectedItems.value.every(message=>message.visibility==='trusted_only'))
 async function load() { try { items.value = (await api.messages({ favorites: true, limit: 100 })).items } catch (e) { error.value = errorText(e) } finally { loading.value = false } }
 function select(id:string){selected.value=selected.value.includes(id)?selected.value.filter(value=>value!==id):[...selected.value,id]}
 async function mergeSelected(){const chosen=items.value.filter(message=>selected.value.includes(message.id));if(chosen.length<2){notify('请至少选择两条消息','error');return}if(chosen.some(message=>message.type!=='text')){notify('只能合并文本消息','error');return}if(!await requestConfirm(`按时间顺序合并 ${chosen.length} 条收藏到日期最早的那条？其余消息会移入回收站。`,{title:'合并收藏消息',confirmText:'确认合并'}))return;try{await api.mergeMessages(selected.value);selected.value=[];selecting.value=false;await load();notify('已合并到最早的收藏消息','success')}catch(e){notify(errorText(e),'error')}}
+async function togglePrivacy(){if(!selected.value.length)return;try{await api.batchMessages(selected.value,allSelectedPrivate.value?'unlock':'lock');selected.value=[];selecting.value=false;await load();notify('隐私锁已更新','success')}catch(error){notify(errorText(error),'error')}}
 onMounted(() => { load(); window.addEventListener('messages-changed', load) })
 onUnmounted(() => window.removeEventListener('messages-changed', load))
 </script>
@@ -23,5 +28,6 @@ onUnmounted(() => window.removeEventListener('messages-changed', load))
   <EmptyState v-else-if="error" :icon="Heart" title="收藏读取失败" :description="error" />
   <EmptyState v-else-if="!filtered.length" :icon="Heart" :title="items.length ? '没有匹配的收藏' : '还没有收藏'" description="收藏内容不受普通自动清理规则影响。" />
   <div v-else class="message-list"><MessageCard v-for="message in filtered" :key="message.id" :message="message" :selectable="selecting" :selected="selected.includes(message.id)" @select="select" @update="m => Object.assign(message, m)" @remove="id => items = items.filter(m => m.id !== id)" /></div>
-  <div v-if="selecting" class="batch-bar batch-bar--compact"><span>已选 {{selected.length}} 条</span><button :disabled="selected.length<2" @click="mergeSelected"><Combine :size="17"/>合并</button></div>
+  <div v-if="selecting" class="batch-bar"><span>已选 {{selected.length}} 条</span><button :disabled="selected.length<2" @click="mergeSelected"><Combine :size="17"/>合并</button><button v-if="isTrusted" :disabled="!selected.length" :aria-pressed="allSelectedPrivate" @click="togglePrivacy"><Unlock v-if="allSelectedPrivate" :size="17"/><Lock v-else :size="17"/>{{allSelectedPrivate?'取消锁':'隐私锁'}}</button><button :disabled="!selected.length" @click="shareOpen=true"><Share2 :size="17"/>分享</button><button @click="selecting=false;selected=[]"><X :size="17"/>取消</button></div>
+  <BatchShareDialog :open="shareOpen" :messages="selectedItems" @close="shareOpen=false"/>
 </section></template>

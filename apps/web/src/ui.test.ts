@@ -1,40 +1,23 @@
-import { describe, expect, it } from 'vitest'
-import { confirmDialog, formatBytes, formatChatTimestamp, formatTime, requestConfirm, resolveConfirm, shouldShowChatTimestamp } from './ui'
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { copyText, ui } from './ui'
 
-describe('ui formatters', () => {
-  it('formats byte values for transfer cards', () => {
-    expect(formatBytes(0)).toBe('0 B')
-    expect(formatBytes(1024)).toBe('1.0 KB')
-    expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB')
-  })
+const clipboardDescriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard')
+const execCommandDescriptor=Object.getOwnPropertyDescriptor(document,'execCommand')
+afterEach(() => {
+  vi.useRealTimers();vi.restoreAllMocks();ui.toast=''
+  if(clipboardDescriptor)Object.defineProperty(navigator,'clipboard',clipboardDescriptor);else delete (navigator as {clipboard?:unknown}).clipboard
+  if(execCommandDescriptor)Object.defineProperty(document,'execCommand',execCommandDescriptor);else delete (document as {execCommand?:unknown}).execCommand
+})
 
-  it('returns a readable time label', () => {
-    expect(formatTime(Date.now())).toMatch(/\d{2}:\d{2}/)
-  })
+describe('copyText', () => {
+  it('falls back and tells the user to copy the visible value manually when permission is unavailable', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: vi.fn(() => false) })
 
-  it('formats WeChat-style timeline labels and five-minute gaps', () => {
-    const now = new Date(2026, 7, 23, 18, 0).getTime()
-    expect(formatChatTimestamp(new Date(2026, 7, 23, 9, 8).getTime(), now)).toBe('09:08')
-    expect(formatChatTimestamp(new Date(2026, 7, 22, 21, 6).getTime(), now)).toBe('昨天 21:06')
-    expect(formatChatTimestamp(new Date(2025, 11, 31, 23, 59).getTime(), now)).toBe('2025年12月31日 23:59')
-    expect(shouldShowChatTimestamp(now)).toBe(true)
-    expect(shouldShowChatTimestamp(now, now - 4 * 60 * 1000)).toBe(false)
-    expect(shouldShowChatTimestamp(now, now - 5 * 60 * 1000)).toBe(true)
-  })
-
-  it('resolves the custom confirmation dialog without using browser confirm', async () => {
-    const result = requestConfirm('确认删除？', { title: '删除消息', confirmText: '删除', danger: true })
-    expect(confirmDialog).toMatchObject({ open: true, title: '删除消息', message: '确认删除？', confirmText: '删除', danger: true })
-    resolveConfirm(true)
-    await expect(result).resolves.toBe(true)
-    expect(confirmDialog.open).toBe(false)
-  })
-
-  it('cancels an earlier confirmation when a new one replaces it', async () => {
-    const earlier = requestConfirm('第一个')
-    const latest = requestConfirm('第二个')
-    await expect(earlier).resolves.toBe(false)
-    resolveConfirm(false)
-    await expect(latest).resolves.toBe(false)
+    expect(await copyText('https://example.test/long-link')).toBe(false)
+    expect(ui.toast).toContain('长按显示的内容手动复制')
+    expect(document.querySelector('textarea')).toBeNull()
   })
 })

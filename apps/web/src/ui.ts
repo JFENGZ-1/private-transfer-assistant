@@ -80,6 +80,18 @@ export function formatChatTimestamp(value: number, nowValue = Date.now()) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${time}`
 }
 
-export function copyText(text: string) {
-  return navigator.clipboard.writeText(text).then(() => notify('已复制到剪贴板', 'success'))
+export async function copyText(text: string) {
+  let copied = false
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); copied = true }
+  } catch { /* fall back to the legacy selection API below */ }
+  if (!copied) {
+    const textarea = document.createElement('textarea')
+    textarea.value = text; textarea.readOnly = true; textarea.style.position = 'fixed'; textarea.style.opacity = '0'; textarea.style.pointerEvents = 'none'
+    document.body.append(textarea); textarea.select(); textarea.setSelectionRange(0, text.length)
+    try { copied = Boolean(document.execCommand?.('copy')) } catch { copied = false }
+    textarea.remove()
+  }
+  notify(copied ? '已复制到剪贴板' : '自动复制不可用，请长按显示的内容手动复制', copied ? 'success' : 'error')
+  return copied
 }

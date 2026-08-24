@@ -1,4 +1,4 @@
-import type { Device, Drop, Message, OcrJobItem, OcrJobStatus, Principal, SearchFilters, Settings, Share } from './types'
+import type { Device, DiagnosticReport, Drop, Message, OcrDiagnosticResult, OcrJobItem, OcrJobStatus, Principal, SearchFilters, Settings, Share } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 let temporaryToken = ''
@@ -88,6 +88,7 @@ export const api = {
   restoreMessage: (id: string) => request<Message>(`/messages/${id}/restore`, { method: 'POST' }),
   downloadUrl: (id: string) => `${API_BASE}/messages/${encodeURIComponent(id)}/download`,
   downloadTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' }),
+  previewTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/preview-token`, { method: 'POST' }),
   downloadMessage: async (id: string, _fileName?: string) => {
     const ticket = await request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' })
     const anchor = document.createElement('a')
@@ -110,16 +111,24 @@ export const api = {
   renameDevice: (id: string, name: string) => request<Device>(`/devices/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
 
   shares: () => request<{ items: Share[] }>('/shares'),
-  createShare: (messageId: string, values: { expiresIn: number; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageId, ...values }) }),
+  createShare: (messageId: string, values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageId, ...values }) }),
+  createMultiShare: (messageIds: string[], values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageIds, ...values }) }),
+  updateShare: (id: string, values: { expiresIn?: number | null; maxDownloads?: number | null }) => request<Share>(`/shares/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(values) }),
   revokeShare: (id: string) => request<{ ok: boolean }>(`/shares/${id}`, { method: 'DELETE' }),
   publicShare: async (token: string, code?: string) => {
-    const data = await request<{ share?: Share; message: Message }>(`/public/shares/${encodeURIComponent(token)}${queryString({ code })}`)
-    return { share: data.share, message: normalizeMessage(data.message) }
+    const data = await request<{ share?: Share; message: Message; messages?: Message[] }>(`/public/shares/${encodeURIComponent(token)}${queryString({ code })}`)
+    const messages=(data.messages??[data.message]).map(normalizeMessage)
+    return { share: data.share, message: messages[0], messages }
   },
   publicShareDownloadUrl: (token: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/download${queryString({ code })}`,
+  publicSharePreviewUrl: (token: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/preview${queryString({ code })}`,
+  publicShareItemDownloadUrl: (token: string, messageId: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/items/${encodeURIComponent(messageId)}/download${queryString({ code })}`,
+  publicShareItemPreviewUrl: (token: string, messageId: string, code?: string) => `${API_BASE}/public/shares/${encodeURIComponent(token)}/items/${encodeURIComponent(messageId)}/preview${queryString({ code })}`,
 
   drops: () => request<{ items: Drop[] }>('/drops'),
   createDrop: (values: { name: string; expiresIn: number; maxUploads?: number | null; maxFileSize?: number | null; allowedTypes?: string[] }) => request<Drop>('/drops', { method: 'POST', body: JSON.stringify(values) }),
+  updateDrop: (id: string, values: { name?: string; expiresIn?: number; maxUploads?: number | null; maxFileSize?: number | null; allowedTypes?: string[] }) => request<Drop>(`/drops/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(values) }),
+  revealDropLink: (id: string) => request<{ token: string; regenerated: boolean }>(`/drops/${encodeURIComponent(id)}/link`, { method: 'POST' }),
   revokeDrop: (id: string) => request<{ ok: boolean }>(`/drops/${id}`, { method: 'DELETE' }),
   publicDrop: (token: string) => request<{ drop: Drop }>(`/public/drops/${encodeURIComponent(token)}`),
   submitDrop: async (token: string, files: File[], name: string, note: string, onProgress: (value: number, index?: number) => void) => {
@@ -157,6 +166,8 @@ export const api = {
     const count = (name: string) => ocr?.counts.find(row => row.status === name)?.count ?? 0
     return { ...base, retention: base.retention ?? { imagesDays: base.retentionDays, filesDays: base.retentionDays }, ocr: { completed: count('done'), pending: count('pending'), processing: count('processing'), failed: count('failed') } }
   },
+  diagnostics: () => request<DiagnosticReport>('/settings/diagnostics'),
+  ocrDiagnostic: () => request<OcrDiagnosticResult>('/settings/diagnostics/ocr', { method: 'POST' }),
   retentionSummary: () => request<{ imagesDays: number; filesDays: number; trashDays: number; downloadedEarlier: boolean }>('/settings/retention'),
   ocrJobs: async (status: OcrJobStatus, offset = 0, limit = 40) => {
     const data = await request<{ items: OcrJobItem[]; total: number; nextOffset: number | null }>(`/ocr/jobs${queryString({ status, offset, limit })}`)
@@ -178,7 +189,7 @@ export function errorText(error: unknown): string {
   const code = error instanceof ApiError ? error.code : 'unknown'
   const labels: Record<string, string> = {
     invalid_password: '主口令不正确', invalid_admin_password: '管理口令不正确', invalid_code: '提取码不正确', code_required: '请输入提取码', unauthorized: '会话已失效，请重新进入',
-    trusted_device_required: '此操作仅限长期设备', payload_too_large: '文件超过上传限制', storage_full: '服务器存储空间不足',
+    trusted_device_required: '此操作仅限长期设备', payload_too_large: '文件超过上传限制', file_too_large: '文件超过投递箱的单文件限制', file_type_not_allowed: '该文件类型不允许投递', storage_full: '服务器存储空间不足',
     share_expired: '分享已过期', share_revoked: '分享已撤销', download_limit_reached: '下载次数已用完', drop_expired: '投递箱已过期',
     network_error: '网络连接失败', passwords_must_differ: '主口令与管理口令必须不同', unsupported_pwa_icon: '请选择 PNG、JPEG 或 WebP 图片', pwa_icon_too_large: '应用图标不能超过 8 MB', invalid_pwa_icon: '图片无效或无法处理', merge_requires_multiple: '请至少选择两条不同的消息', merge_text_only: '只能合并文本消息', merge_targeted_not_supported: '定向消息暂不支持合并', merged_content_too_large: '合并后的文本过长', csrf_rejected: '安全校验失败，请刷新页面后重试', request_failed: '请求失败'
   }
