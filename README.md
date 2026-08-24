@@ -64,7 +64,7 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/main/scripts/bootstrap-baota-native.sh | bash
 ```
 
-脚本会下载当前 `main` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。
+脚本会下载当前 `main` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
 
 出现“安装完成”后执行：
 
@@ -224,7 +224,7 @@ systemctl show private-transfer-assistant-ocr -p MemoryCurrent -p MemoryPeak
 | 内容 | 服务器路径 |
 | --- | --- |
 | 当前版本 | `/opt/private-transfer-assistant/current` |
-| 历史版本 | `/opt/private-transfer-assistant/releases` |
+| 当前版本与最近两个旧版本 | `/opt/private-transfer-assistant/releases` |
 | Node.js 与 Python | `/opt/private-transfer-assistant/bin`、`/opt/private-transfer-python-3.11.16` |
 | Nginx 配置片段 | `/opt/private-transfer-assistant/nginx` |
 | SQLite 数据库 | `/var/lib/private-transfer-assistant/transfer.db` |
