@@ -2,17 +2,17 @@
 
 一个面向个人自托管的跨设备文件传输与粘贴板。手机和电脑不必位于同一局域网；输入主口令可临时访问，使用独立管理口令可把浏览器授权为长期设备。
 
-当前稳定版本为 **v1.3.1**。生产环境使用已经实际验证的 [宝塔 LNMP 原生部署方案](./DEPLOYMENT-BAOTA-LNMP.md)，由 Nginx 提供 HTTPS 和反向代理，应用与 OCR 作为 systemd 服务运行。
+当前稳定版本为 **v1.4.0**。生产环境使用已经实际验证的 [宝塔 LNMP 原生部署方案](./DEPLOYMENT-BAOTA-LNMP.md)，由 Nginx 提供 HTTPS 和反向代理，应用与 OCR 作为 systemd 服务运行。
 
 ## 宝塔原生一键安装
 
 适用于已经安装宝塔面板和 Nginx 的 64 位 Linux，也包含阿里云 CentOS 8.2 遗留兼容流程。先创建 ECS 快照、解析好域名，并建议为 2 GB 内存服务器配置 1–2 GB swap。然后在宝塔终端或 SSH 中以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
 ```
 
-引导脚本会从本仓库下载已发布的 `v1.3.1` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
+引导脚本会从本仓库下载已发布的 `v1.4.0` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
 
 1. 已解析到服务器的域名，不带 `https://`。
 2. 主口令，至少 8 位，并再次确认。
@@ -37,7 +37,7 @@ OCR inference OK: OCR TEST 123456
 不希望直接执行网络脚本时，可先下载并检查：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -61,10 +61,10 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 然后在宝塔终端或 SSH 中以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
 ```
 
-脚本会下载已发布的 `v1.3.1` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
+脚本会下载已发布的 `v1.4.0` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
 
 出现“安装完成”后执行：
 
@@ -75,7 +75,7 @@ systemctl is-active private-transfer-assistant-ocr
 curl -s http://127.0.0.1:3000/api/auth/status
 ```
 
-v1.3.1 正常结果应包含 `"version": "1.3.1"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
+v1.4.0 正常结果应包含 `"version": "1.4.0"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
 
 ```bash
 journalctl -u private-transfer-assistant -n 100 --no-pager
@@ -89,11 +89,12 @@ journalctl -u private-transfer-assistant-ocr -n 100 --no-pager
 - 聊天式发送文本、图片、视频和任意文件，支持来源设备名称、上传进度与跨设备实时同步
 - 主口令临时会话：凭证只保存在当前页面内存，刷新或关闭后退出
 - 管理口令授权长期设备，设置页仅长期设备可访问
+- 长期设备可在设置页修改口令；口令遗忘后也可由服务器管理员执行安全重置
 - 隐私锁：锁定消息只对长期设备可见，包含搜索、缩略图和下载权限
 - 文本、链接、文件名、图片原始名称及 OCR 内容搜索，支持按图片与视频、文件、音频等分类快速浏览
 - 收藏、置顶、标签、备注、消息合并、自由复制与编辑、回收站恢复和批量操作
 - 单条或多条文本与文件共用一个临时分享链接，支持永久有效期、下载次数、二维码和参数编辑
-- 外部投递链接支持快速创建、参数编辑、链接再次显示和二维码
+- 外部投递链接支持文件或纯文本投递、快速创建、参数编辑、链接再次显示和二维码
 - 图片、视频、音频、PDF 与隔离 HTML 的统一预览，其他文件保持原始下载
 - OCR 后台队列、识别结果查看、重新识别和真实图片状态测试
 - PWA 安装与系统分享目标，支持更换应用图标、站点标题和浏览器标签标题
@@ -155,9 +156,14 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 
 将归档复制到另一台服务器、NAS 或对象存储，并额外备份宝塔中的站点 Nginx 配置和 SSL 证书。同一硬盘上的备份无法防范硬盘故障。使用项目备份脚本、设置自动保留天数以及执行恢复的完整步骤见 [部署指南的备份与恢复章节](./DEPLOYMENT-BAOTA-LNMP.md#11-备份)。
 
-## 在服务器上重置口令
+## 忘记口令与安全重置
 
-网页端不提供“忘记口令”。服务器管理员可使用随应用提供的脚本。`read -s` 输入时不会显示字符：
+项目支持口令修改和遗忘后的重置，但不会保存或显示原口令明文：
+
+- 当前浏览器仍是长期设备且记得管理口令时，可在“设置 → 修改口令”中修改主口令或管理口令。
+- 无法进入设置页、管理口令也已遗忘，或所有长期设备均已失效时，由服务器管理员使用随应用提供的脚本设置新口令。
+
+在宝塔终端或 SSH 中重置主口令如下。`read -s` 输入时不会显示字符：
 
 ```bash
 cd /opt/private-transfer-assistant/current
@@ -180,7 +186,7 @@ runuser -u transfer -- env \
 unset NEW_ADMIN
 ```
 
-重置后默认注销所有临时会话和长期设备，需要重新登录并授权长期设备。
+口令至少 8 位，主口令和管理口令不能相同。服务器脚本默认注销所有临时会话和长期设备，需要重新登录并授权长期设备；这能避免遗失设备继续使用旧会话访问。
 
 ## 运维
 
@@ -211,7 +217,7 @@ systemctl show private-transfer-assistant-ocr -p MemoryCurrent -p MemoryPeak
 
 - 必须通过 HTTPS 使用。应用只监听 `127.0.0.1:3000`，阿里云安全组和防火墙不得向公网开放 3000。
 - 临时凭证不写入 Cookie、`localStorage` 或 `sessionStorage`；长期设备使用签名的 HttpOnly、Secure、SameSite=Strict Cookie，可在设置页逐台撤销。使用 Cookie 的写请求还会校验浏览器的 `Origin` 与 `Sec-Fetch-Site`，阻断跨站请求伪造。
-- 仅允许宝塔 Nginx 反向代理应用端口，并使用安装脚本生成的安全配置片段；不要缓存 API、临时分享、外部投递或带能力令牌的请求。
+- 仅允许宝塔 Nginx 反向代理应用端口，并使用安装脚本生成的安全配置片段；其中同源预览必须保留 `X-Frame-Options: SAMEORIGIN` 与 `frame-ancestors 'self'`，不要改为 `DENY`/`'none'`。不要缓存 API、临时分享、外部投递或带能力令牌的请求。
 - 设置、设备管理、OCR 全局开关和投递链接只允许长期设备操作。修改口令与注销全部设备需要再次验证管理口令。
 - 隐私锁由服务端在消息列表、搜索、文件下载和实时推送各层过滤。锁定前已经下载、复制或截屏的内容无法追回。
 - OCR 必须读取原始图片，因此本项目不是服务器不可见的端到端加密方案。数据库、上传文件与备份都应视为敏感数据；推荐启用宿主机磁盘加密，并对异地备份额外加密。

@@ -91,13 +91,7 @@ export const api = {
   previewTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/preview-token`, { method: 'POST' }),
   downloadMessage: async (id: string, _fileName?: string) => {
     const ticket = await request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' })
-    const anchor = document.createElement('a')
-    anchor.href = new URL(ticket.url, location.origin).href
-    anchor.rel = 'noopener'
-    anchor.style.display = 'none'
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
+    location.assign(new URL(ticket.url, location.origin).href)
   },
   search: async (q: string, filters: SearchFilters, cursor?: number) => {
     const scope = [filters.text && 'text', filters.fileName && 'fileName', filters.imageName !== false && 'imageName', filters.imageText && 'ocr'].filter(Boolean).join(',')
@@ -114,6 +108,7 @@ export const api = {
   createShare: (messageId: string, values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageId, ...values }) }),
   createMultiShare: (messageIds: string[], values: { expiresIn: number | null; maxDownloads?: number | null; code?: string }) => request<Share>('/shares', { method: 'POST', body: JSON.stringify({ messageIds, ...values }) }),
   updateShare: (id: string, values: { expiresIn?: number | null; maxDownloads?: number | null }) => request<Share>(`/shares/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(values) }),
+  revealShareLink: (id: string) => request<{ token: string; regenerated: boolean }>(`/shares/${encodeURIComponent(id)}/link`, { method: 'POST' }),
   revokeShare: (id: string) => request<{ ok: boolean }>(`/shares/${id}`, { method: 'DELETE' }),
   publicShare: async (token: string, code?: string) => {
     const data = await request<{ share?: Share; message: Message; messages?: Message[] }>(`/public/shares/${encodeURIComponent(token)}${queryString({ code })}`)
@@ -132,6 +127,11 @@ export const api = {
   revokeDrop: (id: string) => request<{ ok: boolean }>(`/drops/${id}`, { method: 'DELETE' }),
   publicDrop: (token: string) => request<{ drop: Drop }>(`/public/drops/${encodeURIComponent(token)}`),
   submitDrop: async (token: string, files: File[], name: string, note: string, onProgress: (value: number, index?: number) => void) => {
+    if (!files.length) {
+      const result = await request<{ ok: boolean; receipt?: string; messageId?: string }>(`/public/drops/${encodeURIComponent(token)}/text`, { method: 'POST', body: JSON.stringify({ content: note, name }) })
+      onProgress(1, 0)
+      return { ok: true, receipt: result.receipt ?? result.messageId ?? '已送达', receipts: [result.receipt ?? result.messageId ?? '已送达'] }
+    }
     const totalBytes = files.reduce((sum, file) => sum + Math.max(file.size, 1), 0)
     let completedBytes = 0
     const receipts: string[] = []

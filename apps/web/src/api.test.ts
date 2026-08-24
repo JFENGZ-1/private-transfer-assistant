@@ -61,23 +61,32 @@ describe('public drop uploads', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/drops/drop-1/link')
     expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe('POST')
   })
+
+  it('submits text when no file is selected', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, messageId: 'text-1', receipt: 'text-1' }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const progress = vi.fn()
+
+    const result = await api.submitDrop('drop token', [], '访客', '只有文本', progress)
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/public/drops/drop%20token/text')
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual({ content: '只有文本', name: '访客' })
+    expect(result.receipt).toBe('text-1')
+    expect(progress).toHaveBeenCalledWith(1, 0)
+  })
 })
 
 describe('authenticated downloads', () => {
   it('requests a short-lived ticket and navigates without buffering the file', async () => {
-    const click = vi.fn()
-    const anchor = { href: '', rel: '', style: { display: '' }, click, remove: vi.fn() }
+    const assign = vi.fn()
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ token: 'ticket', expiresAt: Date.now() + 60_000, url: '/api/downloads/ticket' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('location', { origin: 'https://transfer.test' })
-    vi.stubGlobal('document', { createElement: vi.fn(() => anchor), body: { append: vi.fn() } })
+    vi.stubGlobal('location', { origin: 'https://transfer.test', assign })
 
     await api.downloadMessage('message-1', 'large.iso')
 
     expect(fetchMock).toHaveBeenCalledWith('/api/messages/message-1/download-token', expect.objectContaining({ method: 'POST' }))
-    expect(anchor.href).toBe('https://transfer.test/api/downloads/ticket')
-    expect(click).toHaveBeenCalledOnce()
-    expect(anchor.remove).toHaveBeenCalledOnce()
+    expect(assign).toHaveBeenCalledWith('https://transfer.test/api/downloads/ticket')
   })
 })
 

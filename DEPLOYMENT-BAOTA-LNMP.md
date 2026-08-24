@@ -29,7 +29,7 @@ Node.js / Fastify（systemd）
 - 检测 Python 3.10–3.13并创建独立虚拟环境。
 - 创建无登录权限的 `transfer` 用户。
 - 将每次安装构建为独立 release，并通过软链接切换当前版本。
-- 执行前后端类型检查、46 项自动测试和生产构建。
+- 执行前后端类型检查、完整自动测试和生产构建。
 - 安装 RapidOCR、ONNX Runtime、Pillow和 NumPy。
 - 以实际 `transfer` 用户加载 OCR 模型，生成测试图片并执行一次真实 OCR 推理。
 - OCR 无法识别测试文字时终止安装，不切换正式版本。
@@ -78,13 +78,13 @@ nginx -v
 先创建阿里云 ECS 快照，再通过宝塔终端或 SSH 以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
 ```
 
 [一键引导脚本](./scripts/bootstrap-baota-native.sh)只负责：
 
 1. 检查 `root`、`curl` 和 `tar`。
-2. 从 GitHub 下载本仓库已发布的 `v1.3.1` 源码到一次性临时目录。
+2. 从 GitHub 下载本仓库已发布的 `v1.4.0` 源码到一次性临时目录。
 3. 校验压缩包能够被完整解开并检查关键项目文件。
 4. 将终端重新连接给正式安装程序，以便隐藏输入域名和两个口令。
 5. 安装结束后删除临时源码；正式 release 和数据不会被删除。
@@ -94,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant
 如果不希望把网络脚本直接交给 Bash，可先下载、查看再执行：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -289,6 +289,10 @@ cat /opt/private-transfer-assistant/nginx/server-directives.conf
 ```
 
 把其中内容放进该站点 Nginx配置的 `server { ... }` 内、所有 `location` 外。不要删除宝塔生成的 SSL、证书续签和 include 配置。
+
+其中 `X-Frame-Options` 必须是 `SAMEORIGIN`，CSP 的 `frame-ancestors` 必须是 `'self'`。这只允许同一渡口站点嵌入 PDF、HTML、视频等预览，其他网站仍无法套用页面。不要改成 `DENY` 或 `'none'`，否则浏览器会在站内预览时提示“拒绝连接”。HTML 文件本身仍由应用返回独立的 `sandbox` CSP，脚本、联网和父页面访问保持禁用。
+
+从早期版本升级时，安装脚本会备份并修正宝塔站点配置中的旧版 `DENY`/`'none'`，通过 `nginx -t` 后才重载；检查失败会自动恢复原配置。备份文件与站点配置位于同一目录。
 
 配置默认允许最大 10 GiB 单文件。修改大小时要同时调整：
 
@@ -498,6 +502,8 @@ systemctl start private-transfer-assistant-ocr
 
 ## 13. 重置遗忘的口令
 
+项目不会保存或显示原口令明文。仍能使用长期设备且记得管理口令时，可直接在网页“设置 → 修改口令”中设置新口令；无法进入设置页或管理口令也已遗忘时，再使用下面的服务器应急重置方式。
+
 主口令：
 
 ```bash
@@ -521,7 +527,7 @@ runuser -u transfer -- env \
 unset NEW_ADMIN
 ```
 
-默认会注销全部临时会话和长期设备。
+口令至少 8 位，主口令和管理口令不能相同。服务器脚本默认注销全部临时会话和长期设备，重置后需要重新登录并授权长期设备。
 
 ## 14. 常见问题
 
@@ -558,7 +564,7 @@ CentOS 8 的 GLIBC 版本低于部分预编译 Node 原生包的要求，系统�
 如果使用旧脚本遇到此错误，不要升级或手动替换系统 GLIBC，也不要修改 `/usr/bin/g++`。直接重新执行最新一键命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.3.1/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
 ```
 
 脚本会保留 `/etc/private-transfer-assistant.env`、数据库和文件，复用已经编译好的独立 Python，然后创建新的 release 继续安装。

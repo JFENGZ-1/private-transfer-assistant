@@ -181,7 +181,7 @@ onUnmounted(() => {
           @click="createQuickDrop"
         >
           <PackagePlus :size="19" /><span>{{
-            quickDropLoading ? "创建中…" : "快速投递"
+            quickDropLoading ? "创建中…" : "投递"
           }}</span></button
         ><RouterLink
           v-for="item in nav.slice(3)"
@@ -285,7 +285,7 @@ onUnmounted(() => {
               @click="createQuickDrop"
             >
               <PackagePlus :size="20" /><span>{{
-                quickDropLoading ? "创建中…" : "快速投递"
+                quickDropLoading ? "创建中…" : "投递"
               }}</span></button
             ><RouterLink
               v-for="item in nav.slice(3)"
