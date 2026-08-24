@@ -2,17 +2,17 @@
 
 一个面向个人自托管的跨设备文件传输与粘贴板。手机和电脑不必位于同一局域网；输入主口令可临时访问，使用独立管理口令可把浏览器授权为长期设备。
 
-当前稳定版本为 **v1.4.0**。生产环境使用已经实际验证的 [宝塔 LNMP 原生部署方案](./DEPLOYMENT-BAOTA-LNMP.md)，由 Nginx 提供 HTTPS 和反向代理，应用与 OCR 作为 systemd 服务运行。
+当前稳定版本为 **v1.4.1**。生产环境使用已经实际验证的 [宝塔 LNMP 原生部署方案](./DEPLOYMENT-BAOTA-LNMP.md)，由 Nginx 提供 HTTPS 和反向代理，应用与 OCR 作为 systemd 服务运行。
 
 ## 宝塔原生一键安装
 
 适用于已经安装宝塔面板和 Nginx 的 64 位 Linux，也包含阿里云 CentOS 8.2 遗留兼容流程。先创建 ECS 快照、解析好域名，并建议为 2 GB 内存服务器配置 1–2 GB swap。然后在宝塔终端或 SSH 中以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.1/scripts/bootstrap-baota-native.sh | bash
 ```
 
-引导脚本会从本仓库下载已发布的 `v1.4.0` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
+引导脚本会从本仓库下载已发布的 `v1.4.1` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
 
 1. 已解析到服务器的域名，不带 `https://`。
 2. 主口令，至少 8 位，并再次确认。
@@ -37,7 +37,7 @@ OCR inference OK: OCR TEST 123456
 不希望直接执行网络脚本时，可先下载并检查：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.1/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -61,10 +61,10 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 然后在宝塔终端或 SSH 中以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.0/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.1/scripts/bootstrap-baota-native.sh | bash
 ```
 
-脚本会下载已发布的 `v1.4.0` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
+脚本会下载已发布的 `v1.4.1` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
 
 出现“安装完成”后执行：
 
@@ -75,7 +75,7 @@ systemctl is-active private-transfer-assistant-ocr
 curl -s http://127.0.0.1:3000/api/auth/status
 ```
 
-v1.4.0 正常结果应包含 `"version": "1.4.0"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
+v1.4.1 正常结果应包含 `"version": "1.4.1"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
 
 ```bash
 journalctl -u private-transfer-assistant -n 100 --no-pager
