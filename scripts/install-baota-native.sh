@@ -9,6 +9,7 @@ readonly OCR_SERVICE_NAME="private-transfer-assistant-ocr"
 readonly INSTALL_ROOT="/opt/private-transfer-assistant"
 readonly RELEASES_DIR="${INSTALL_ROOT}/releases"
 readonly CURRENT_LINK="${INSTALL_ROOT}/current"
+readonly RELEASES_TO_KEEP=3
 readonly BIN_DIR="${INSTALL_ROOT}/bin"
 readonly NODE_LINK="${BIN_DIR}/node"
 readonly DATA_DIR="/var/lib/private-transfer-assistant"
@@ -693,6 +694,47 @@ activate_release() {
   fi
 }
 
+cleanup_old_releases() {
+  local current_release candidate candidate_name candidate_real
+  local old_release_count=0
+
+  current_release="$(readlink -f "${CURRENT_LINK}" 2>/dev/null || true)"
+  if [[ -z "${current_release}" || "${current_release}" != "${RELEASES_DIR}/"* || ! -d "${current_release}" ]]; then
+    warn "当前 release 路径无效，跳过历史版本清理：${current_release:-未找到}"
+    return
+  fi
+
+  while IFS= read -r candidate_name; do
+    [[ -n "${candidate_name}" ]] || continue
+    candidate="${RELEASES_DIR}/${candidate_name}"
+    candidate_real="$(readlink -f "${candidate}" 2>/dev/null || true)"
+
+    if [[ -z "${candidate_real}" || "${candidate_real}" != "${RELEASES_DIR}/"* || ! -d "${candidate_real}" ]]; then
+      warn "跳过无法安全确认的 release 路径：${candidate}"
+      continue
+    fi
+    if [[ "${candidate_real}" == "${current_release}" ]]; then
+      continue
+    fi
+
+    if [[ ! "${candidate_name}" =~ ^[0-9]{8}T[0-9]{6}Z-[[:alnum:]_.-]+-[0-9]+$ ]]; then
+      warn "跳过名称不符合安装脚本规则的目录：${candidate}"
+      continue
+    fi
+
+    old_release_count=$((old_release_count + 1))
+    if (( old_release_count < RELEASES_TO_KEEP )); then
+      continue
+    fi
+
+    if rm -rf --one-file-system -- "${candidate_real}"; then
+      log "已删除超出保留数量的历史 release：${candidate_name}"
+    else
+      warn "历史 release 清理失败，不影响当前版本运行：${candidate_name}"
+    fi
+  done < <(find "${RELEASES_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | LC_ALL=C sort -r)
+}
+
 write_nginx_snippets() {
   local nginx_dir="${INSTALL_ROOT}/nginx"
   install -d -o root -g root -m 0755 "${nginx_dir}"
@@ -742,6 +784,7 @@ main() {
   write_systemd_units
   activate_release
   write_nginx_snippets
+  cleanup_old_releases
 
   log "安装完成"
   printf '%s\n' \
