@@ -7,8 +7,9 @@ import type { Message, UploadTask } from '../types'
 import { formatBytes, notify } from '../ui'
 
 const emit = defineEmits<{ sent: [message: Message] }>()
-const content = ref(''); const open = ref(false); const fileInput = ref<HTMLInputElement>(); const mediaInput = ref<HTMLInputElement>(); const cameraInput = ref<HTMLInputElement>(); const textarea = ref<HTMLTextAreaElement>(); const sending = ref(false)
-const dragActive = ref(false); let dragDepth = 0; let activeUploads = 0
+const content = ref(''); const open = ref(false); const fileInput = ref<HTMLInputElement>(); const mediaInput = ref<HTMLInputElement>(); const cameraInput = ref<HTMLInputElement>(); const textarea = ref<HTMLTextAreaElement>(); const composerShell=ref<HTMLElement>(); const sending = ref(false)
+const selectionStart=ref(0); const selectionEnd=ref(0)
+const dragActive = ref(false); let dragDepth = 0; let activeUploads = 0; let composerObserver:ResizeObserver|undefined; let publishedComposerHeight=0
 async function sendText() { const value = content.value.trim(); if (!value || sending.value) return; sending.value = true; try { const message = await api.sendText(value); content.value = ''; emit('sent', message) } catch (e) { notify(errorText(e), 'error') } finally { sending.value = false } }
 function enqueueFiles(files: File[]) {
   for (const file of files) state.uploads.push({ id: crypto.randomUUID(), file, progress: 0, status: 'queued', controller: new AbortController() })
@@ -24,7 +25,30 @@ async function startUpload(task: UploadTask) {
 function selectFiles(event: Event) { const files = [...((event.target as HTMLInputElement).files ?? [])]; open.value = false; enqueueFiles(files); (event.target as HTMLInputElement).value = '' }
 function chooseFiles(input?:HTMLInputElement){open.value=false;input?.click()}
 function cancel(task: UploadTask) { task.status = 'cancelled'; task.controller?.abort(); const index = state.uploads.indexOf(task); if (index >= 0) state.uploads.splice(index, 1); pumpUploads() }
-function handlePaste(event: ClipboardEvent) { const images = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith('image/')); if (!images.length) return; event.preventDefault(); enqueueFiles(images); notify(`已从剪贴板加入 ${images.length} 张图片`, 'success') }
+function insertPastedText(text:string){const start=Math.min(selectionStart.value,content.value.length),end=Math.min(Math.max(selectionEnd.value,start),content.value.length);content.value=`${content.value.slice(0,start)}${text}${content.value.slice(end)}`;return start+text.length}
+function pastedNotice(text:string,images:File[]){notify(images.length?`已粘贴${text?'文本和':''}${images.length} 张图片`:'已粘贴到输入框','success')}
+function isEditableTarget(target:EventTarget|null){return target instanceof HTMLInputElement||target instanceof HTMLTextAreaElement||(target instanceof HTMLElement&&target.isContentEditable)}
+function handlePaste(event: ClipboardEvent) {
+  const images=[...(event.clipboardData?.files??[])].filter(file=>file.type.startsWith('image/'))
+  const text=event.clipboardData?.getData('text/plain')??''
+  if(!images.length){if(text)window.setTimeout(()=>{rememberSelection();resizeTextarea();pastedNotice(text,[])},0);return}
+  event.preventDefault()
+  const caret=text?insertPastedText(text):undefined
+  enqueueFiles(images)
+  void focusAfterPaste(caret)
+  pastedNotice(text,images)
+}
+function handleGlobalPaste(event:ClipboardEvent){
+  if(event.defaultPrevented||isEditableTarget(event.target))return
+  const images=[...(event.clipboardData?.files??[])].filter(file=>file.type.startsWith('image/'))
+  const text=event.clipboardData?.getData('text/plain')??''
+  if(!text&&!images.length)return
+  event.preventDefault()
+  const caret=text?insertPastedText(text):undefined
+  if(images.length)enqueueFiles(images)
+  void focusAfterPaste(caret)
+  pastedNotice(text,images)
+}
 function resizeTextarea() {
   const element = textarea.value
   if (!element) return
@@ -38,6 +62,9 @@ function resizeTextarea() {
   element.style.height = `${Math.round(height)}px`
   element.style.overflowY = element.scrollHeight > maxHeight ? 'auto' : 'hidden'
 }
+function publishComposerHeight(){const height=Math.ceil(composerShell.value?.getBoundingClientRect().height??0);if(!height||height===publishedComposerHeight)return;if(publishedComposerHeight)window.dispatchEvent(new CustomEvent('composer-will-resize',{detail:{previousHeight:publishedComposerHeight,height}}));document.documentElement.style.setProperty('--composer-height',`${height}px`);publishedComposerHeight=height}
+function rememberSelection(){const element=textarea.value;if(!element)return;selectionStart.value=element.selectionStart;selectionEnd.value=element.selectionEnd}
+async function focusAfterPaste(caret?:number){await nextTick();resizeTextarea();const element=textarea.value;if(!element)return;element.focus();const position=caret??element.value.length;element.setSelectionRange(position,position);rememberSelection()}
 async function quickPaste() {
   open.value = false
   try {
@@ -56,10 +83,12 @@ async function quickPaste() {
         if (!pastedText && item.types.includes('text/plain')) pastedText = await (await item.getType('text/plain')).text()
       }
     } else pastedText = await navigator.clipboard.readText()
-    if (pastedText) content.value = content.value ? `${content.value}\n${pastedText}` : pastedText
+    let caret:number|undefined
+    if (pastedText) caret=insertPastedText(pastedText)
     if (images.length) enqueueFiles(images)
     if (!pastedText && !images.length) { notify('剪贴板中没有可粘贴的文本或图片', 'error'); return }
-    notify(images.length ? `已粘贴${pastedText ? '文本和' : ''}${images.length} 张图片` : '已粘贴到输入框', 'success')
+    await focusAfterPaste(caret)
+    pastedNotice(pastedText,images)
   } catch {
     notify('无法读取剪贴板，请允许剪贴板权限或使用系统粘贴', 'error')
   }
@@ -70,16 +99,16 @@ function onDragOver(event: DragEvent) { if (hasDraggedFiles(event)) event.preven
 function onDragLeave(event: DragEvent) { if (!hasDraggedFiles(event)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragActive.value = false }
 function onDrop(event: DragEvent) { if (!hasDraggedFiles(event)) return; event.preventDefault(); const files = [...(event.dataTransfer?.files ?? [])]; dragDepth = 0; dragActive.value = false; enqueueFiles(files) }
 watch(content, () => { void nextTick(resizeTextarea) })
-onMounted(() => { document.addEventListener('dragenter', onDragEnter); document.addEventListener('dragover', onDragOver); document.addEventListener('dragleave', onDragLeave); document.addEventListener('drop', onDrop); window.addEventListener('resize', resizeTextarea); window.visualViewport?.addEventListener('resize', resizeTextarea); void nextTick(resizeTextarea) })
-onUnmounted(() => { document.removeEventListener('dragenter', onDragEnter); document.removeEventListener('dragover', onDragOver); document.removeEventListener('dragleave', onDragLeave); document.removeEventListener('drop', onDrop); window.removeEventListener('resize', resizeTextarea); window.visualViewport?.removeEventListener('resize', resizeTextarea) })
+onMounted(() => { document.addEventListener('dragenter', onDragEnter); document.addEventListener('dragover', onDragOver); document.addEventListener('dragleave', onDragLeave); document.addEventListener('drop', onDrop); document.addEventListener('paste',handleGlobalPaste); window.addEventListener('resize', resizeTextarea); window.visualViewport?.addEventListener('resize', resizeTextarea);if(composerShell.value&&globalThis.ResizeObserver){composerObserver=new ResizeObserver(publishComposerHeight);composerObserver.observe(composerShell.value)} void nextTick(()=>{resizeTextarea();publishComposerHeight()}) })
+onUnmounted(() => { document.removeEventListener('dragenter', onDragEnter); document.removeEventListener('dragover', onDragOver); document.removeEventListener('dragleave', onDragLeave); document.removeEventListener('drop', onDrop); document.removeEventListener('paste',handleGlobalPaste); window.removeEventListener('resize', resizeTextarea); window.visualViewport?.removeEventListener('resize', resizeTextarea);composerObserver?.disconnect();publishedComposerHeight=0;document.documentElement.style.removeProperty('--composer-height') })
 </script>
 <template>
-  <div class="composer-shell">
+  <div ref="composerShell" class="composer-shell">
     <div v-if="state.uploads.length" class="upload-tray"><div v-for="task in state.uploads" :key="task.id" class="upload-item"><div><strong>{{ task.file.name }}</strong><span>{{ task.status === 'error' ? task.error : task.status === 'queued' ? `${formatBytes(task.file.size)} · 等待上传` : `${formatBytes(task.file.size)} · ${Math.round(task.progress*100)}%` }}</span><div class="progress"><i :class="{ error: task.status === 'error' }" :style="{ width: `${Math.max(task.progress*100, task.status === 'error' ? 100 : 0)}%` }" /></div></div><button class="icon-button" @click="cancel(task)"><X :size="17" /></button></div></div>
     <form class="composer" @submit.prevent="sendText">
       <div class="attach-wrap"><button type="button" class="icon-button attach" aria-label="添加附件" @click="open = !open"><Paperclip :size="21" /></button><Transition name="fade"><div v-if="open" class="attach-menu"><button type="button" @click="chooseFiles(cameraInput)"><Camera :size="19" /><span>拍照</span></button><button type="button" @click="chooseFiles(mediaInput)"><Image :size="19" /><span>选择图片与视频</span></button><button type="button" @click="chooseFiles(fileInput)"><File :size="19" /><span>选择文件</span></button></div></Transition></div>
       <button type="button" class="icon-button attach quick-paste" aria-label="快速粘贴" title="快速粘贴" @click="quickPaste"><ClipboardPaste :size="20" /></button>
-      <textarea ref="textarea" v-model="content" rows="1" placeholder="输入或粘贴内容…" @keydown.enter.exact.prevent="sendText" @paste="handlePaste" />
+      <textarea ref="textarea" v-model="content" rows="1" placeholder="输入或粘贴内容…" @input="rememberSelection" @click="rememberSelection" @keyup="rememberSelection" @select="rememberSelection" @keydown.enter.exact.prevent="sendText" @paste="handlePaste" />
       <button class="send-button" :disabled="!content.trim() || sending" aria-label="发送"><Send :size="19" /></button>
       <input ref="cameraInput" class="visually-hidden" type="file" accept="image/*" capture="environment" aria-label="相机拍照" @change="selectFiles" /><input ref="mediaInput" class="visually-hidden" type="file" accept="image/*,video/*" multiple aria-label="选择图片与视频" @change="selectFiles" /><input ref="fileInput" class="visually-hidden" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.html,.htm,.zip,.rar,.7z,.tar,.gz,.bz2,.xz,.epub,.mobi,.apk,.exe,.msi,.dmg,.iso,application/pdf,application/zip,application/x-7z-compressed,application/vnd.rar,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,text/html,application/json,application/xml,application/octet-stream" multiple aria-label="选择文件" @change="selectFiles" />
     </form>

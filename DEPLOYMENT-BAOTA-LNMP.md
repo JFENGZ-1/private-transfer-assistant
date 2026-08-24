@@ -78,13 +78,13 @@ nginx -v
 先创建阿里云 ECS 快照，再通过宝塔终端或 SSH 以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.7/scripts/bootstrap-baota-native.sh | bash
 ```
 
 [一键引导脚本](./scripts/bootstrap-baota-native.sh)只负责：
 
 1. 检查 `root`、`curl` 和 `tar`。
-2. 从 GitHub 下载本仓库已发布的 `v1.4.6` 源码到一次性临时目录。
+2. 从 GitHub 下载本仓库已发布的 `v1.4.7` 源码到一次性临时目录。
 3. 校验压缩包能够被完整解开并检查关键项目文件。
 4. 将终端重新连接给正式安装程序，以便隐藏输入域名和两个口令。
 5. 安装结束后删除临时源码；正式 release 和数据不会被删除。
@@ -94,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant
 如果不希望把网络脚本直接交给 Bash，可先下载、查看再执行：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.7/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -564,7 +564,7 @@ CentOS 8 的 GLIBC 版本低于部分预编译 Node 原生包的要求，系统�
 如果使用旧脚本遇到此错误，不要升级或手动替换系统 GLIBC，也不要修改 `/usr/bin/g++`。直接重新执行最新一键命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.7/scripts/bootstrap-baota-native.sh | bash
 ```
 
 脚本会保留 `/etc/private-transfer-assistant.env`、数据库和文件，复用已经编译好的独立 Python，然后创建新的 release 继续安装。

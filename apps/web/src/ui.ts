@@ -4,6 +4,8 @@ export const ui = reactive({
   toast: '' as string,
   toastKind: 'info' as 'info' | 'success' | 'error',
   inboxPinnedOpen: false,
+  inboxAwayFromLatest: false,
+  inboxNewMessageCount: 0,
 })
 
 export const confirmDialog = reactive({

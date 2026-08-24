@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import {
+  ArrowDown,
   Github,
   Heart,
   Inbox,
@@ -24,6 +25,11 @@ import SearchOverlay from "../components/SearchOverlay.vue";
 import LinkQrDialog from "../components/LinkQrDialog.vue";
 import type { Message } from "../types";
 import { defaultDropValues } from "../drop-defaults";
+import {
+  armIncomingMessageSound,
+  playIncomingMessageSound,
+  shouldPlayIncomingMessageSound,
+} from "../message-notifications";
 
 const route = useRoute();
 const router = useRouter();
@@ -32,6 +38,7 @@ const drawerOpen = ref(false);
 let socket: WebSocket | undefined;
 let reconnectTimer = 0;
 let stopped = false;
+let stopSoundUnlock: (() => void) | undefined;
 const quickDropLoading = ref(false);
 const quickDropOpen = ref(false);
 const quickDropLink = ref("");
@@ -84,6 +91,9 @@ async function createQuickDrop() {
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") drawerOpen.value = false;
 }
+function scrollInboxToLatest() {
+  window.dispatchEvent(new CustomEvent("inbox-scroll-latest"));
+}
 function applyRealtimeEvent(event: {
   type?: string;
   id?: string;
@@ -91,6 +101,14 @@ function applyRealtimeEvent(event: {
 }) {
   if (event.type === "message.created" && event.message) {
     const message = normalizeMessage(event.message as Message);
+    if (
+      shouldPlayIncomingMessageSound(
+        message,
+        state.principal?.sessionId,
+        route.path,
+      )
+    )
+      playIncomingMessageSound();
     if (!state.messages.some((item) => item.id === message.id))
       state.messages.unshift(message);
   } else if (event.type === "message.updated" && event.message) {
@@ -148,6 +166,7 @@ watch(
 );
 onMounted(() => {
   stopped = false;
+  stopSoundUnlock = armIncomingMessageSound();
   loadShared();
   connect();
   window.addEventListener("keydown", handleKeydown);
@@ -156,6 +175,8 @@ onUnmounted(() => {
   stopped = true;
   window.clearTimeout(reconnectTimer);
   socket?.close();
+  stopSoundUnlock?.();
+  stopSoundUnlock = undefined;
   window.removeEventListener("keydown", handleKeydown);
 });
 </script>
@@ -234,6 +255,14 @@ onUnmounted(() => {
           </h1>
         </div>
         <div class="mobile-header-tools">
+          <button
+            v-if="route.path === '/app' && ui.inboxAwayFromLatest"
+            class="icon-button mobile-latest-button"
+            :aria-label="ui.inboxNewMessageCount ? `${ui.inboxNewMessageCount} 条新消息，回到最新` : '回到最新消息'"
+            @click="scrollInboxToLatest"
+          >
+            <ArrowDown :size="19" /><span v-if="ui.inboxNewMessageCount">{{ ui.inboxNewMessageCount > 99 ? '99+' : ui.inboxNewMessageCount }}</span>
+          </button>
           <button
             v-if="route.path === '/app' && pinnedCount"
             class="icon-button mobile-pinned-toggle"
