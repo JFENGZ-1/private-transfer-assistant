@@ -760,12 +760,50 @@ client_body_timeout 24h;
 send_timeout 24h;
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 add_header X-Content-Type-Options "nosniff" always;
-add_header X-Frame-Options "DENY" always;
+add_header X-Frame-Options "SAMEORIGIN" always;
 add_header Referrer-Policy "no-referrer" always;
 add_header Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" always;
-add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self' blob:; manifest-src 'self'" always;
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self' blob:; manifest-src 'self'" always;
 EOF
   chmod 0644 "${nginx_dir}"/*.conf
+}
+
+repair_legacy_nginx_preview_headers() {
+  local site_conf="/www/server/panel/vhost/nginx/${DOMAIN}.conf" backup nginx_bin=""
+  [[ -f "${site_conf}" ]] || return
+  if ! grep -Fq 'add_header X-Frame-Options "DENY" always;' "${site_conf}" \
+    && ! grep -Fq "frame-ancestors 'none'" "${site_conf}"; then
+    return
+  fi
+
+  backup="${site_conf}.private-transfer-preview-$(date -u +%Y%m%dT%H%M%SZ).bak"
+  cp -a -- "${site_conf}" "${backup}"
+  sed -i \
+    -e 's/add_header X-Frame-Options "DENY" always;/add_header X-Frame-Options "SAMEORIGIN" always;/g' \
+    -e "s/frame-ancestors 'none'/frame-ancestors 'self'/g" \
+    "${site_conf}"
+
+  if command -v nginx >/dev/null 2>&1; then
+    nginx_bin="$(command -v nginx)"
+  elif [[ -x /www/server/nginx/sbin/nginx ]]; then
+    nginx_bin="/www/server/nginx/sbin/nginx"
+  else
+    cp -a -- "${backup}" "${site_conf}"
+    warn "未找到 Nginx 命令，已恢复站点配置；请在宝塔中按新的安全片段手动更新"
+    return
+  fi
+
+  if "${nginx_bin}" -t; then
+    if "${nginx_bin}" -s reload; then
+      log "已修复旧版 Nginx 预览限制并重载：${site_conf}（备份：${backup}）"
+    else
+      warn "站点配置已修复且检查通过，但 Nginx 自动重载失败；请在宝塔中手动重载"
+    fi
+  else
+    cp -a -- "${backup}" "${site_conf}"
+    "${nginx_bin}" -t >/dev/null 2>&1 || true
+    warn "Nginx 配置检查失败，已恢复：${backup}；请在宝塔中手动检查"
+  fi
 }
 
 main() {
@@ -784,6 +822,7 @@ main() {
   write_systemd_units
   activate_release
   write_nginx_snippets
+  repair_legacy_nginx_preview_headers
   cleanup_old_releases
 
   log "安装完成"

@@ -211,7 +211,7 @@ systemctl show private-transfer-assistant-ocr -p MemoryCurrent -p MemoryPeak
 
 - 必须通过 HTTPS 使用。应用只监听 `127.0.0.1:3000`，阿里云安全组和防火墙不得向公网开放 3000。
 - 临时凭证不写入 Cookie、`localStorage` 或 `sessionStorage`；长期设备使用签名的 HttpOnly、Secure、SameSite=Strict Cookie，可在设置页逐台撤销。使用 Cookie 的写请求还会校验浏览器的 `Origin` 与 `Sec-Fetch-Site`，阻断跨站请求伪造。
-- 仅允许宝塔 Nginx 反向代理应用端口，并使用安装脚本生成的安全配置片段；不要缓存 API、临时分享、外部投递或带能力令牌的请求。
+- 仅允许宝塔 Nginx 反向代理应用端口，并使用安装脚本生成的安全配置片段；其中同源预览必须保留 `X-Frame-Options: SAMEORIGIN` 与 `frame-ancestors 'self'`，不要改为 `DENY`/`'none'`。不要缓存 API、临时分享、外部投递或带能力令牌的请求。
 - 设置、设备管理、OCR 全局开关和投递链接只允许长期设备操作。修改口令与注销全部设备需要再次验证管理口令。
 - 隐私锁由服务端在消息列表、搜索、文件下载和实时推送各层过滤。锁定前已经下载、复制或截屏的内容无法追回。
 - OCR 必须读取原始图片，因此本项目不是服务器不可见的端到端加密方案。数据库、上传文件与备份都应视为敏感数据；推荐启用宿主机磁盘加密，并对异地备份额外加密。

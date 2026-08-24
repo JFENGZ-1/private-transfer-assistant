@@ -290,6 +290,10 @@ cat /opt/private-transfer-assistant/nginx/server-directives.conf
 
 把其中内容放进该站点 Nginx配置的 `server { ... }` 内、所有 `location` 外。不要删除宝塔生成的 SSL、证书续签和 include 配置。
 
+其中 `X-Frame-Options` 必须是 `SAMEORIGIN`，CSP 的 `frame-ancestors` 必须是 `'self'`。这只允许同一渡口站点嵌入 PDF、HTML、视频等预览，其他网站仍无法套用页面。不要改成 `DENY` 或 `'none'`，否则浏览器会在站内预览时提示“拒绝连接”。HTML 文件本身仍由应用返回独立的 `sandbox` CSP，脚本、联网和父页面访问保持禁用。
+
+从早期版本升级时，安装脚本会备份并修正宝塔站点配置中的旧版 `DENY`/`'none'`，通过 `nginx -t` 后才重载；检查失败会自动恢复原配置。备份文件与站点配置位于同一目录。
+
 配置默认允许最大 10 GiB 单文件。修改大小时要同时调整：
 
 - Nginx 的 `client_max_body_size`。
