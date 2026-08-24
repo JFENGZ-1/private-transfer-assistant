@@ -21,7 +21,7 @@
 - **Old files are difficult to find.** Search message text, original file names, image names, tags, source devices, and OCR-recognized image text, with fast content-type filters.
 - **You need to hand content to someone else safely.** Create expiring links and QR codes for one or many messages, or create an external drop link that accepts files and plain text.
 
-Your database, uploaded files, and OCR data remain on your own server. The current stable release is **v1.4.5**. Dukou itself does not depend on Baota: the application and OCR worker run as systemd services. Public access requires Nginx or another HTTPS reverse proxy; the repository's fully tested walkthrough currently uses [Baota LNMP](./DEPLOYMENT-BAOTA-LNMP.md).
+Your database, uploaded files, and OCR data remain on your own server. The current stable release is **v1.4.6**. Dukou itself does not depend on Baota: the application and OCR worker run as systemd services. Public access requires Nginx or another HTTPS reverse proxy; the repository's fully tested walkthrough currently uses [Baota LNMP](./DEPLOYMENT-BAOTA-LNMP.md).
 
 ## Screenshots
 
@@ -69,7 +69,7 @@ The installer supports 64-bit systemd Linux distributions with `apt`, `dnf`, or 
 Create a server snapshot first, point a domain at the server, and add 1–2 GB of swap on a 2 GB machine. Then run as `root` over SSH or any root terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh | bash
 ```
 
 The `baota-native` filename is retained for compatibility with existing install commands; Baota is not a runtime dependency.
@@ -99,7 +99,7 @@ Expose only ports 80 and 443 to the public internet. Restrict SSH and any contro
 To inspect the network script before executing it:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -123,7 +123,7 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 Run the same installer again as `root`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.6/scripts/bootstrap-baota-native.sh | bash
 ```
 
 The installer downloads the published source, runs server/web tests, builds production assets, and performs a real OCR inference. It creates a new release and switches `/opt/private-transfer-assistant/current` only after the local health check succeeds; otherwise it attempts to restore the previous release. The current release and two previous releases are retained, while older OCR virtual environments are removed.
@@ -137,7 +137,7 @@ systemctl is-active private-transfer-assistant-ocr
 curl -s http://127.0.0.1:3000/api/auth/status
 ```
 
-For v1.4.5, expect `"version": "1.4.5"`, two `active` lines, and `{"initialized":true,...}`. For errors:
+For v1.4.6, expect `"version": "1.4.6"`, two `active` lines, and `{"initialized":true,...}`. For errors:
 
 ```bash
 journalctl -u private-transfer-assistant -n 100 --no-pager

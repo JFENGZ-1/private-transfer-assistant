@@ -5,7 +5,7 @@ import { createReadStream, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { requireAuth } from './auth.js';
 import { indexMessage, setting, setSetting } from './db.js';
-import { OCR_DIAGNOSTIC_EXPECTED, ocrDiagnosticImage } from './ocr-diagnostic-image.js';
+import { OCR_DIAGNOSTIC_EXPECTED, ocrDiagnosticImage, ocrDiagnosticMatches } from './ocr-diagnostic-image.js';
 import { sha256 } from './security.js';
 
 function numericSetting(app:FastifyInstance,key:string,fallback:number){const value=Number(setting(app.db,key));return Number.isFinite(value)&&value>=0?value:fallback;}
@@ -25,14 +25,14 @@ const wait=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 async function runOcrDiagnostic(app:FastifyInstance):Promise<OcrDiagnosticResult>{
   const started=Date.now(),expectedText=OCR_DIAGNOSTIC_EXPECTED;
   if(setting(app.db,'ocr_enabled')==='false')return {level:'warning',status:'disabled',detail:'OCR 已按设置关闭，未执行真实识别',recognizedText:'',expectedText,durationMs:0};
-  const blobId=nanoid(),messageId=nanoid(),jobId=nanoid(),image=Buffer.concat([ocrDiagnosticImage(),Buffer.from(`\n${messageId}`)]),digest=sha256(image),filePath=path.join(app.config.filesDir,digest.slice(0,2),digest);
+  const blobId=nanoid(),messageId=nanoid(),jobId=nanoid(),image=ocrDiagnosticImage(),digest=sha256(image),filePath=path.join(app.config.filesDir,digest.slice(0,2),`${digest}-${messageId}`);
   try{
     await fs.mkdir(path.dirname(filePath),{recursive:true});await fs.writeFile(filePath,image,{flag:'wx'});
     const now=Date.now();app.db.transaction(()=>{app.db.prepare('INSERT INTO blobs(id,sha256,size,path,mime,ref_count,created_at) VALUES(?,?,?,?,?,?,?)').run(blobId,digest,image.length,filePath,'image/png',1,now);app.db.prepare(`INSERT INTO messages(id,type,file_name,mime,blob_id,size,sha256,source_name,visibility,created_at,updated_at,ocr_status,note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(messageId,'file','OCR-状态测试.png','image/png',blobId,image.length,digest,'系统状态测试','trusted_only',now,now,'pending','状态测试完成后自动清理');app.db.prepare(`INSERT INTO ocr_jobs(id,message_id,status,attempts,error,created_at,updated_at) VALUES(?,?,'pending',0,NULL,0,?)`).run(jobId,messageId,now);})();
     while(Date.now()-started<30_000){
       const row=app.db.prepare('SELECT j.status,j.attempts,j.error,m.ocr_text AS recognizedText FROM ocr_jobs j JOIN messages m ON m.id=j.message_id WHERE j.id=?').get(jobId) as {status:string;attempts:number;error:string|null;recognizedText:string}|undefined;
       if(row?.status==='done'){
-        const recognizedText=(row.recognizedText??'').trim(),normalize=(value:string)=>value.toUpperCase().replace(/[^A-Z0-9]/g,''),matched=normalize(recognizedText).includes(normalize(expectedText)),durationMs=Date.now()-started;
+        const recognizedText=(row.recognizedText??'').trim(),matched=ocrDiagnosticMatches(recognizedText),durationMs=Date.now()-started;
         return {level:matched?'ok':recognizedText?'warning':'error',status:'done',detail:matched?'真实 OCR 识别成功':recognizedText?'OCR 已返回，但内容与测试文本不一致':'OCR 已完成，但未识别到文字',recognizedText,expectedText,matched,attempts:row.attempts,durationMs};
       }
       if(row?.status==='failed')return {level:'error',status:'failed',detail:row.error||'OCR 任务失败',recognizedText:'',expectedText,attempts:row.attempts,durationMs:Date.now()-started};
