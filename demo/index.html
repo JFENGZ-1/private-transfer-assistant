@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Interactive fictional-data demo of Dukou, the self-hosted private transfer assistant.">
+    <meta name="theme-color" content="#0f766e">
+    <title>Dukou · Live Demo</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="demo-notice">
+      <span class="notice-dot"></span>
+      <span data-i18n="demoNotice">Fictional-data demo · No file leaves your browser and no server API is called.</span>
+      <a href="https://github.com/JFENGZ-1/private-transfer-assistant" data-i18n="viewSource">View source</a>
+    </div>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="./" aria-label="Dukou demo home">
+          <img src="./icon.svg" alt="">
+          <strong>Dukou</strong>
+        </a>
+
+        <nav class="side-nav">
+          <button class="nav-item active" data-view="assistant"><span>▱</span><b data-i18n="assistant">Assistant</b></button>
+          <button class="nav-item" data-view="favorites"><span>♡</span><b data-i18n="favorites">Favorites</b></button>
+          <button class="nav-item" data-view="transfers"><span>⌁</span><b data-i18n="transfers">Transfers</b></button>
+          <button class="nav-item" data-view="settings"><span>⚙</span><b data-i18n="settings">Settings</b></button>
+        </nav>
+
+        <div class="side-bottom">
+          <button class="plain-button" id="searchButton"><span>⌕</span><span data-i18n="search">Search</span></button>
+          <a class="repo-link" href="https://github.com/JFENGZ-1/private-transfer-assistant">⌘ JFENGZ-1/private-transfer-assistant</a>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="mobile-header">
+          <a class="mobile-brand" href="./"><img src="./icon.svg" alt=""><strong>Dukou</strong></a>
+          <div class="mobile-actions">
+            <button class="icon-button" id="mobileSearchButton" aria-label="Search">⌕</button>
+            <button class="language-button" data-language-toggle>中文</button>
+          </div>
+        </header>
+
+        <header class="page-header">
+          <div>
+            <p class="eyebrow" data-i18n="privateSpace">PRIVATE SPACE</p>
+            <h1 id="viewTitle" data-i18n="assistantTitle">Transfer Assistant</h1>
+          </div>
+          <div class="header-actions">
+            <button class="language-button" data-language-toggle>中文</button>
+            <a class="github-button" href="https://github.com/JFENGZ-1/private-transfer-assistant" data-i18n="github">GitHub</a>
+          </div>
+        </header>
+
+        <nav class="mobile-nav" aria-label="Mobile navigation">
+          <button class="active" data-view="assistant" data-i18n="assistant">Assistant</button>
+          <button data-view="favorites" data-i18n="favorites">Favorites</button>
+          <button data-view="transfers" data-i18n="transfers">Transfers</button>
+          <button data-view="settings" data-i18n="settings">Settings</button>
+        </nav>
+
+        <section class="view active" data-view-panel="assistant">
+          <div class="pinned-strip">
+            <span>⌖</span>
+            <div><strong data-i18n="pinned">Pinned</strong><small data-i18n="pinnedHint">Deployment notes and frequently used content</small></div>
+            <button data-demo-action data-i18n="open">Open</button>
+          </div>
+
+          <div class="timeline" id="timeline">
+            <div class="date-chip" data-i18n="today">Today</div>
+
+            <article class="message text-message" data-search="deploy nginx https domain certificate 部署 域名 证书">
+              <button class="message-menu" data-demo-action aria-label="Message actions">••</button>
+              <p data-i18n="messageDeploy">Production checklist: domain, HTTPS certificate, reverse proxy, and an off-server backup.</p>
+              <div class="message-meta"><span data-i18n="deviceLaptop">Studio laptop</span><span>10:18</span></div>
+            </article>
+
+            <article class="message link-message" data-search="github private transfer assistant source repository 项目 仓库">
+              <button class="message-menu" data-demo-action aria-label="Message actions">••</button>
+              <a href="https://github.com/JFENGZ-1/private-transfer-assistant">github.com/JFENGZ-1/private-transfer-assistant</a>
+              <span class="tag">#project</span>
+              <div class="message-meta"><span data-i18n="devicePhone">Travel phone</span><span>10:21</span></div>
+            </article>
+
+            <div class="date-chip">10:26</div>
+
+            <article class="message file-message" data-search="boarding pass image png ocr airport 登机牌 图片">
+              <button class="message-menu" data-demo-action aria-label="Message actions">••</button>
+              <div class="file-row">
+                <div class="file-thumb image-thumb">IMG</div>
+                <div><strong data-i18n="boardingPass">boarding-pass.png</strong><small>428 KB · OCR ready</small></div>
+                <button class="download-button" data-demo-action aria-label="Download">⇩</button>
+              </div>
+              <div class="ocr-preview" data-i18n="ocrPreview">Recognized: Flight ZJ 2026 · Gate 18 · 14:30</div>
+              <div class="message-meta"><span data-i18n="devicePhone">Travel phone</span><span>10:26</span></div>
+            </article>
+
+            <article class="message file-message" data-search="project brief pdf document 项目 简报 文件">
+              <button class="message-menu" data-demo-action aria-label="Message actions">••</button>
+              <div class="file-row">
+                <div class="file-thumb">PDF</div>
+                <div><strong>project-brief.pdf</strong><small>1.8 MB · PDF preview</small></div>
+                <button class="download-button" data-demo-action aria-label="Download">⇩</button>
+              </div>
+              <div class="message-meta"><span data-i18n="deviceLaptop">Studio laptop</span><span>10:29</span></div>
+            </article>
+          </div>
+
+          <form class="composer" id="demoComposer">
+            <button type="button" class="composer-icon" data-demo-action aria-label="Attach">⌕</button>
+            <textarea id="composerInput" rows="1" data-i18n-placeholder="composerPlaceholder" placeholder="Type or paste something…"></textarea>
+            <button type="submit" class="send-button" aria-label="Send">➤</button>
+          </form>
+        </section>
+
+        <section class="view content-view" data-view-panel="favorites">
+          <div class="section-intro">
+            <div><p class="eyebrow" data-i18n="organized">ORGANIZED</p><h2 data-i18n="favoriteTitle">Saved for later</h2></div>
+            <span class="count-chip">3</span>
+          </div>
+          <div class="card-grid">
+            <article class="library-card"><span class="card-icon">⌘</span><div><strong>private-transfer-assistant</strong><p data-i18n="favoriteRepo">Source, releases, and installation instructions</p></div><button data-demo-action>♥</button></article>
+            <article class="library-card"><span class="card-icon">PDF</span><div><strong>project-brief.pdf</strong><p data-i18n="favoritePdf">Shared from Studio laptop · today</p></div><button data-demo-action>♥</button></article>
+            <article class="library-card"><span class="card-icon">TXT</span><div><strong data-i18n="backupTitle">Backup checklist</strong><p data-i18n="backupText">Database + files + production configuration</p></div><button data-demo-action>♥</button></article>
+          </div>
+        </section>
+
+        <section class="view content-view" data-view-panel="transfers">
+          <div class="section-intro">
+            <div><p class="eyebrow" data-i18n="outbound">OUTBOUND</p><h2 data-i18n="transferTitle">Share and receive</h2></div>
+            <button class="primary-button" data-demo-action data-i18n="newTransfer">+ New</button>
+          </div>
+          <div class="transfer-tabs"><button class="active" data-i18n="temporaryShares">Temporary shares</button><button data-demo-action data-i18n="externalDrops">External drops</button></div>
+          <div class="transfer-list">
+            <article class="transfer-card"><span class="transfer-icon">⌁</span><div><strong>project-brief.pdf + 2 items</strong><p data-i18n="shareMeta">Expires in 23 hours · 1 / 5 downloads</p><small data-i18n="shareHint">The link can be displayed again or opened as a QR code.</small></div><button data-demo-action>▦</button><button data-demo-action>✎</button></article>
+            <article class="transfer-card"><span class="transfer-icon">⇥</span><div><strong data-i18n="dropName">Send files to me</strong><p data-i18n="dropMeta">0 / 10 uploads · 500 MB per file</p><small data-i18n="dropHint">Accepts files or plain text from any browser.</small></div><button data-demo-action>▦</button><button data-demo-action>✎</button></article>
+          </div>
+        </section>
+
+        <section class="view content-view" data-view-panel="settings">
+          <div class="settings-grid">
+            <article class="setting-card wide"><div class="setting-heading"><div><p class="eyebrow">OCR</p><h2 data-i18n="ocrSearch">OCR image search</h2><small data-i18n="ocrHint">Images are indexed asynchronously after upload.</small></div><button class="toggle on" data-demo-action aria-label="OCR enabled"><span></span></button></div><div class="metric-row"><div><strong>128</strong><span data-i18n="completed">Completed</span></div><div><strong>0</strong><span data-i18n="queued">Queued</span></div><div><strong>0</strong><span data-i18n="processing">Processing</span></div><div><strong>1</strong><span data-i18n="failed">Failed</span></div></div></article>
+            <article class="setting-card"><p class="eyebrow" data-i18n="storage">STORAGE</p><h2>14.6 GB</h2><div class="progress"><span></span></div><p data-i18n="retention">Files, images, and trash are kept forever by default.</p></article>
+            <article class="setting-card"><p class="eyebrow" data-i18n="trustedDevices">TRUSTED DEVICES</p><h2>3</h2><p data-i18n="trustedHint">Studio laptop · Travel phone · Home tablet</p><button class="secondary-button" data-demo-action data-i18n="manage">Manage</button></article>
+            <article class="setting-card wide"><p class="eyebrow" data-i18n="appearance">APPEARANCE</p><h2 data-i18n="siteIdentity">Site identity</h2><div class="field-row"><label><span data-i18n="siteTitle">Site title</span><input value="Dukou" readonly></label><label><span data-i18n="tabTitle">Browser title</span><input value="Dukou · Private Transfer Assistant" readonly></label></div></article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="search-backdrop" id="searchOverlay" hidden>
+      <section class="search-dialog" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+        <div class="search-bar"><span>⌕</span><input id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Search messages and file names…"><button id="closeSearch" data-i18n="cancel">Cancel</button></div>
+        <div class="search-body"><p id="searchTitle" data-i18n="searchSpecified">Search specific content</p><div class="search-types"><button data-search-term="png" data-i18n="imagesVideos">Images & videos</button><button data-search-term="pdf" data-i18n="files">Files</button><button data-search-term="github" data-i18n="links">Links</button><button data-search-term="phone" data-i18n="sourceDevice">Source device</button></div><div id="searchResults" class="search-results"></div></div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

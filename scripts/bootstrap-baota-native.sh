@@ -4,7 +4,7 @@ IFS=$'\n\t'
 umask 022
 
 readonly REPOSITORY="JFENGZ-1/private-transfer-assistant"
-readonly DEFAULT_REF="v1.4.3"
+readonly DEFAULT_REF="v1.4.4"
 
 log() { printf '\n\033[1;32m[渡口一键安装]\033[0m %s\n' "$*"; }
 die() { printf '\n\033[1;31m[渡口一键安装] 错误：\033[0m%s\n' "$*" >&2; exit 1; }
@@ -18,8 +18,8 @@ cleanup() {
 trap cleanup EXIT
 
 [[ "${EUID}" -eq 0 ]] || die "请使用 root 运行，或在命令末尾使用 sudo bash"
-command -v curl >/dev/null 2>&1 || die "系统缺少 curl，请先在宝塔终端安装 curl"
-command -v tar >/dev/null 2>&1 || die "系统缺少 tar，请先在宝塔终端安装 tar"
+command -v curl >/dev/null 2>&1 || die "系统缺少 curl，请先通过系统包管理器安装 curl"
+command -v tar >/dev/null 2>&1 || die "系统缺少 tar，请先通过系统包管理器安装 tar"
 
 SOURCE_REF="${TRANSFER_GITHUB_REF:-${DEFAULT_REF}}"
 [[ "${SOURCE_REF}" =~ ^[A-Za-z0-9._/-]+$ ]] || die "TRANSFER_GITHUB_REF 格式无效"

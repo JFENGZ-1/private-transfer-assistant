@@ -835,10 +835,15 @@ main() {
     "OCR 日志：journalctl -u ${OCR_SERVICE_NAME} -f" \
     "Nginx 反代片段：${INSTALL_ROOT}/nginx/location.conf" \
     "Nginx 安全片段：${INSTALL_ROOT}/nginx/server-directives.conf"
-  printf '\n下一步：在宝塔为 %s 创建纯静态站点、申请 SSL，并把反向代理指向 http://127.0.0.1:%s。\n' "${DOMAIN}" "${APP_PORT}"
+  if [[ -d /www/server/panel/vhost/nginx ]]; then
+    printf '\n下一步：在宝塔为 %s 创建纯静态站点、申请 SSL，并把反向代理指向 http://127.0.0.1:%s。\n' "${DOMAIN}" "${APP_PORT}"
+  else
+    printf '\n下一步：安装并配置 Nginx（或其他 HTTPS 反向代理），将 %s 转发到 http://127.0.0.1:%s；配置时使用上方生成的 Nginx 片段。\n' "${DOMAIN}" "${APP_PORT}"
+    printf '宝塔不是运行依赖；如不使用面板，可使用 Certbot/acme.sh 申请证书并手动维护站点配置。\n'
+  fi
   printf '首次登录并设为长期设备后，请删除 %s 中的 MAIN_PASSWORD 和 ADMIN_PASSWORD 两行，再重启应用。\n' "${ENV_FILE}"
   if [[ "${LEGACY_CENTOS8}" == true ]]; then
-    printf 'CentOS 已更新到可获得的最后归档快照；确认宝塔和应用正常后，请安排一次服务器重启以加载最新归档内核。\n'
+    printf 'CentOS 已更新到可获得的最后归档快照；确认反向代理和应用正常后，请安排一次服务器重启以加载最新归档内核。\n'
   fi
 }
 

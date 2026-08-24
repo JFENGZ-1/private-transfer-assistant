@@ -1,6 +1,6 @@
 # 宝塔 Nginx 原生部署指南（自动安装脚本）
 
-本文适用于“渡口 · 私人传输助手”1.0 主版本及包含本安装脚本的后续源码。服务器已经安装宝塔面板和 Nginx，但尚未安装 Docker、Node.js、Python OCR 或其他运行环境。
+本文详细记录使用宝塔面板和 Nginx 部署“渡口 · 私人传输助手”的流程。应用本身不依赖宝塔：同一个安装脚本也可运行在未安装宝塔的 systemd Linux 上；此时需要自行安装 Nginx（或其他反向代理）、申请 HTTPS 证书，并把脚本生成的反向代理与安全片段加入站点配置。
 
 最终架构：
 
@@ -8,7 +8,7 @@
 手机 / 电脑
     │ HTTPS、WebSocket
     ▼
-宝塔 Nginx（80/443）
+Nginx（宝塔管理，可选，80/443）
     │ http://127.0.0.1:3000
     ▼
 Node.js / Fastify（systemd）
@@ -16,7 +16,7 @@ Node.js / Fastify（systemd）
     └─ RapidOCR / ONNX Runtime（独立 systemd 服务）
 ```
 
-不使用 Docker 和 Caddy。Nginx站点及证书仍由宝塔管理，安装脚本不会直接修改宝塔生成的 Nginx配置。
+本指南不使用 Docker 和 Caddy。示例中的 Nginx 站点及证书由宝塔管理，但这是运维选择而不是应用运行依赖；安装脚本不会直接创建新站点或签发证书。
 
 ## 1. 安装脚本做什么
 
@@ -35,7 +35,7 @@ Node.js / Fastify（systemd）
 - OCR 无法识别测试文字时终止安装，不切换正式版本。
 - 创建 Node 与 OCR 两个 systemd 服务，并设置 CPU、内存和文件权限限制。
 - 启动应用并检查 `/api/auth/status` 健康接口。
-- 生成可复制到宝塔的 Nginx反向代理和安全配置片段。
+- 生成可用于宝塔或系统 Nginx 的反向代理和安全配置片段。
 - 重复执行时保留生产密钥和数据；新应用健康检查失败时尝试恢复上一 release。
 
 ## 2. 服务器要求
@@ -43,7 +43,7 @@ Node.js / Fastify（systemd）
 - 2 核 CPU、2 GB内存，建议配置 1–2 GB swap。
 - 64 位 Debian、Ubuntu、Rocky Linux、AlmaLinux或其他现代发行版。
 - systemd。
-- 宝塔面板和 Nginx已经正常运行。
+- 本指南后续按宝塔已经安装且 Nginx 正常运行编写；不使用宝塔时需自行准备反向代理和 HTTPS。
 - 一个解析到服务器公网 IP 的域名。
 - 出站网络能访问 Node.js 官方站点、npm 和 Python 包索引。
 
@@ -78,13 +78,13 @@ nginx -v
 先创建阿里云 ECS 快照，再通过宝塔终端或 SSH 以 `root` 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.3/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
 ```
 
 [一键引导脚本](./scripts/bootstrap-baota-native.sh)只负责：
 
 1. 检查 `root`、`curl` 和 `tar`。
-2. 从 GitHub 下载本仓库已发布的 `v1.4.3` 源码到一次性临时目录。
+2. 从 GitHub 下载本仓库已发布的 `v1.4.4` 源码到一次性临时目录。
 3. 校验压缩包能够被完整解开并检查关键项目文件。
 4. 将终端重新连接给正式安装程序，以便隐藏输入域名和两个口令。
 5. 安装结束后删除临时源码；正式 release 和数据不会被删除。
@@ -94,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant
 如果不希望把网络脚本直接交给 Bash，可先下载、查看再执行：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.3/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -564,7 +564,7 @@ CentOS 8 的 GLIBC 版本低于部分预编译 Node 原生包的要求，系统�
 如果使用旧脚本遇到此错误，不要升级或手动替换系统 GLIBC，也不要修改 `/usr/bin/g++`。直接重新执行最新一键命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.3/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
 ```
 
 脚本会保留 `/etc/private-transfer-assistant.env`、数据库和文件，复用已经编译好的独立 Python，然后创建新的 release 继续安装。
