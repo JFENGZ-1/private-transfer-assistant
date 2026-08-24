@@ -21,7 +21,7 @@
 - **文件多了以后难以查找**：支持文件名、图片原始名称、标签、来源设备和 OCR 图片文字搜索，并可按内容类型快速筛选。
 - **需要把内容安全地交给别人**：单条或多条内容可生成临时分享、二维码；也可建立外部投递入口接收文件或纯文本。
 
-数据、文件和 OCR 均保存在你自己的服务器。当前稳定版本为 **v1.4.4**；应用不依赖宝塔，核心服务由 systemd 运行。公网部署需要 Nginx 或其他反向代理提供 HTTPS；本仓库已经实际验证并详细记录的是 [宝塔 LNMP 配置方式](./DEPLOYMENT-BAOTA-LNMP.md)。
+数据、文件和 OCR 均保存在你自己的服务器。当前稳定版本为 **v1.4.5**；应用不依赖宝塔，核心服务由 systemd 运行。公网部署需要 Nginx 或其他反向代理提供 HTTPS；本仓库已经实际验证并详细记录的是 [宝塔 LNMP 配置方式](./DEPLOYMENT-BAOTA-LNMP.md)。
 
 ## 界面预览
 
@@ -53,8 +53,8 @@
 ## 核心能力
 
 - **聊天式跨设备传输**：发送文本、图片、视频和任意文件，显示来源设备名称、上传进度，并实时同步到其他设备。
-- **两级设备授权**：主口令用于临时会话，管理口令用于长期设备；设置页和隐私内容仅长期设备可访问。
-- **消息整理**：收藏、置顶、标签、备注、消息合并、自由复制与编辑、回收站恢复及批量操作。
+- **两级设备授权**：主口令用于临时会话，管理口令用于长期设备；设置页、隐私内容和回收站仅长期设备可访问。
+- **消息整理**：收藏、置顶、标签、备注、消息合并、自由复制与编辑，以及仅限长期设备的回收站恢复和批量操作。
 - **全文与分类搜索**：搜索文本、链接、文件名、图片名称和 OCR 识别内容，并按日期、图片与视频、文件、链接、音频及来源设备浏览。
 - **分享与投递**：多条文本和文件共用一个临时分享链接，支持有效期、下载次数、二维码和参数编辑；外部投递可接收文件或纯文本。
 - **统一预览**：图片、视频、音频、PDF 与隔离 HTML 均可在站内预览；PDF 使用客户端 PDF.js，兼容没有内置 PDF 阅读器的手机浏览器。
@@ -69,12 +69,12 @@
 先创建服务器快照、解析好域名，并建议为 2 GB 内存服务器配置 1–2 GB swap。然后通过任意 root 终端或 SSH 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
 ```
 
 脚本文件名中的 `baota-native` 为兼容既有安装命令而保留，不表示宝塔是运行依赖。
 
-引导脚本会从本仓库下载已发布的 `v1.4.4` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
+引导脚本会从本仓库下载已发布的 `v1.4.5` 源码，再调用 [原生安装脚本](./scripts/install-baota-native.sh)。安装过程中依次输入：
 
 1. 已解析到服务器的域名，不带 `https://`。
 2. 主口令，至少 8 位，并再次确认。
@@ -99,7 +99,7 @@ OCR inference OK: OCR TEST 123456
 不希望直接执行网络脚本时，可先下载并检查：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -123,10 +123,10 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 然后在任意 root 终端或 SSH 中执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
 ```
 
-脚本会下载已发布的 `v1.4.4` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
+脚本会下载已发布的 `v1.4.5` 源码、运行服务端和前端测试、执行生产构建与真实 OCR 推理测试，然后创建新的 release。只有本机健康检查通过后才会原子切换 `/opt/private-transfer-assistant/current` 并重启两个 systemd 服务；健康检查失败时会尝试恢复上一 release。升级全部成功后自动保留当前 release 和最近两个旧 release，并清理更早版本，避免 OCR 虚拟环境持续占用磁盘。
 
 出现“安装完成”后执行：
 
@@ -137,7 +137,7 @@ systemctl is-active private-transfer-assistant-ocr
 curl -s http://127.0.0.1:3000/api/auth/status
 ```
 
-v1.4.4 正常结果应包含 `"version": "1.4.4"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
+v1.4.5 正常结果应包含 `"version": "1.4.5"`、两个 `active`，以及 `{"initialized":true,...}`。如果异常，查看最近日志：
 
 ```bash
 journalctl -u private-transfer-assistant -n 100 --no-pager
@@ -149,6 +149,7 @@ journalctl -u private-transfer-assistant-ocr -n 100 --no-pager
 ## 更多功能细节
 
 - 隐私锁会在消息列表、搜索、缩略图、下载和实时推送各层隐藏锁定内容，仅长期设备可见。
+- 回收站对临时设备完全隐藏；已删除消息列表、编辑历史、恢复和永久删除均由服务端强制限制为仅长期设备可操作。
 - OCR 后台队列支持查看识别结果、重新识别历史图片，以及执行包含真实图片推理和结果返回的状态测试。
 - 长期设备可在设置页修改主口令与管理口令；完全遗忘后可由服务器管理员执行安全重置。
 - PWA 支持安装、系统分享目标、自定义应用图标、站点标题和浏览器标签标题。
@@ -270,7 +271,7 @@ systemctl show private-transfer-assistant-ocr -p MemoryCurrent -p MemoryPeak
 - 必须通过 HTTPS 使用。应用只监听 `127.0.0.1:3000`，阿里云安全组和防火墙不得向公网开放 3000。
 - 临时凭证不写入 Cookie、`localStorage` 或 `sessionStorage`；长期设备使用签名的 HttpOnly、Secure、SameSite=Strict Cookie，可在设置页逐台撤销。使用 Cookie 的写请求还会校验浏览器的 `Origin` 与 `Sec-Fetch-Site`，阻断跨站请求伪造。
 - 仅允许宝塔 Nginx 反向代理应用端口，并使用安装脚本生成的安全配置片段；其中同源预览必须保留 `X-Frame-Options: SAMEORIGIN` 与 `frame-ancestors 'self'`，不要改为 `DENY`/`'none'`。不要缓存 API、临时分享、外部投递或带能力令牌的请求。
-- 设置、设备管理、OCR 全局开关和投递链接只允许长期设备操作。修改口令与注销全部设备需要再次验证管理口令。
+- 设置、设备管理、回收站、OCR 全局开关和投递链接只允许长期设备操作。修改口令与注销全部设备需要再次验证管理口令。
 - 隐私锁由服务端在消息列表、搜索、文件下载和实时推送各层过滤。锁定前已经下载、复制或截屏的内容无法追回。
 - OCR 必须读取原始图片，因此本项目不是服务器不可见的端到端加密方案。数据库、上传文件与备份都应视为敏感数据；推荐启用宿主机磁盘加密，并对异地备份额外加密。
 - 程序与数据均位于宝塔网站根目录之外，systemd 服务使用无登录权限的 `transfer` 用户运行，不与 Nginx 或 PHP 共享写权限。

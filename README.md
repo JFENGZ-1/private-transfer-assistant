@@ -21,7 +21,7 @@
 - **Old files are difficult to find.** Search message text, original file names, image names, tags, source devices, and OCR-recognized image text, with fast content-type filters.
 - **You need to hand content to someone else safely.** Create expiring links and QR codes for one or many messages, or create an external drop link that accepts files and plain text.
 
-Your database, uploaded files, and OCR data remain on your own server. The current stable release is **v1.4.4**. Dukou itself does not depend on Baota: the application and OCR worker run as systemd services. Public access requires Nginx or another HTTPS reverse proxy; the repository's fully tested walkthrough currently uses [Baota LNMP](./DEPLOYMENT-BAOTA-LNMP.md).
+Your database, uploaded files, and OCR data remain on your own server. The current stable release is **v1.4.5**. Dukou itself does not depend on Baota: the application and OCR worker run as systemd services. Public access requires Nginx or another HTTPS reverse proxy; the repository's fully tested walkthrough currently uses [Baota LNMP](./DEPLOYMENT-BAOTA-LNMP.md).
 
 ## Screenshots
 
@@ -53,8 +53,8 @@ Your database, uploaded files, and OCR data remain on your own server. The curre
 ## Core Capabilities
 
 - **Chat-style cross-device transfer:** send text, images, videos, and arbitrary files with source-device names, upload progress, and realtime updates.
-- **Two-level device authorization:** the main passphrase opens a temporary session; the admin passphrase authorizes persistent devices. Settings and private messages are restricted to trusted devices.
-- **Message organization:** favorites, pins, tags, notes, message merging, free-form copy/edit, trash recovery, and batch operations.
+- **Two-level device authorization:** the main passphrase opens a temporary session; the admin passphrase authorizes persistent devices. Settings, private messages, and the trash are restricted to trusted devices.
+- **Message organization:** favorites, pins, tags, notes, message merging, free-form copy/edit, and trusted-device-only trash recovery and batch operations.
 - **Full-text and categorized search:** search text, links, file names, image names, and OCR text; browse by date, image/video, file, link, audio, or source device.
 - **Sharing and external drops:** share multiple text/file messages through one link with expiration, download limits, QR codes, and editable parameters; receive files or plain text through drop links.
 - **Unified preview:** in-app preview for images, video, audio, PDF, and isolated HTML. PDF.js renders PDFs on mobile browsers without a built-in PDF viewer.
@@ -69,7 +69,7 @@ The installer supports 64-bit systemd Linux distributions with `apt`, `dnf`, or 
 Create a server snapshot first, point a domain at the server, and add 1–2 GB of swap on a 2 GB machine. Then run as `root` over SSH or any root terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
 ```
 
 The `baota-native` filename is retained for compatibility with existing install commands; Baota is not a runtime dependency.
@@ -99,7 +99,7 @@ Expose only ports 80 and 443 to the public internet. Restrict SSH and any contro
 To inspect the network script before executing it:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
+curl -fL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh -o /root/bootstrap-baota-native.sh
 less /root/bootstrap-baota-native.sh
 bash /root/bootstrap-baota-native.sh
 ```
@@ -123,7 +123,7 @@ systemctl start private-transfer-assistant private-transfer-assistant-ocr
 Run the same installer again as `root`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.4/scripts/bootstrap-baota-native.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JFENGZ-1/private-transfer-assistant/v1.4.5/scripts/bootstrap-baota-native.sh | bash
 ```
 
 The installer downloads the published source, runs server/web tests, builds production assets, and performs a real OCR inference. It creates a new release and switches `/opt/private-transfer-assistant/current` only after the local health check succeeds; otherwise it attempts to restore the previous release. The current release and two previous releases are retained, while older OCR virtual environments are removed.
@@ -137,7 +137,7 @@ systemctl is-active private-transfer-assistant-ocr
 curl -s http://127.0.0.1:3000/api/auth/status
 ```
 
-For v1.4.4, expect `"version": "1.4.4"`, two `active` lines, and `{"initialized":true,...}`. For errors:
+For v1.4.5, expect `"version": "1.4.5"`, two `active` lines, and `{"initialized":true,...}`. For errors:
 
 ```bash
 journalctl -u private-transfer-assistant -n 100 --no-pager
@@ -149,6 +149,7 @@ If a mobile browser or installed PWA still shows the old interface, fully close 
 ## Additional Feature Details
 
 - The privacy lock is enforced across message lists, search, thumbnails, downloads, and realtime events; locked messages are visible only on trusted devices.
+- The trash is hidden from temporary sessions. Listing deleted messages, reading their edit history, restoring them, and permanently deleting them are enforced as trusted-device-only operations by the server.
 - The OCR queue exposes recognized text, supports history reindexing, and includes a real-image diagnostic with returned recognition results.
 - Trusted devices can change both passphrases in Settings. If all trusted devices are lost, a server administrator can securely reset them.
 - PWA installation, Web Share Target, custom application icons, site title, and browser-tab title are supported.
@@ -271,7 +272,7 @@ If the local health check succeeds but public access fails, inspect the reverse 
 - Temporary credentials are not written to cookies, `localStorage`, or `sessionStorage`. Trusted devices use signed HttpOnly, Secure, SameSite=Strict cookies and can be individually revoked.
 - Cookie-authenticated writes validate `Origin` and `Sec-Fetch-Site` to block cross-site request forgery.
 - Keep `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'` for same-origin PDF/HTML preview. Do not use `DENY`/`'none'` and do not cache API, share, drop, or capability-token requests.
-- Settings, device management, global OCR controls, and drop links require a trusted device. Passphrase changes and global logout require the admin passphrase again.
+- Settings, device management, the trash, global OCR controls, and drop links require a trusted device. Passphrase changes and global logout require the admin passphrase again.
 - Privacy-locked content is filtered by the server in lists, search, downloads, thumbnails, and realtime events. Content already downloaded, copied, or captured cannot be revoked.
 - OCR must read original images, so this is not an end-to-end encrypted, server-blind system. Treat the database, files, and backups as sensitive and encrypt off-server backups.
 - Services run as the non-login `transfer` user. Program/data directories remain outside the web root and are not writable by Nginx or PHP.

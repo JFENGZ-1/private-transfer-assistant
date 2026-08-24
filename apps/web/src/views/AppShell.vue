@@ -192,6 +192,7 @@ onUnmounted(() => {
             item.label
           }}</span></RouterLink
         ><RouterLink
+          v-if="isTrusted"
           to="/app/trash"
           :class="{ active: route.path === '/app/trash' }"
           ><Trash2 :size="19" /><span>回收站</span></RouterLink
@@ -297,6 +298,7 @@ onUnmounted(() => {
                 item.label
               }}</span></RouterLink
             ><RouterLink
+              v-if="isTrusted"
               to="/app/trash"
               :class="{ active: route.path === '/app/trash' }"
               @click="drawerOpen = false"

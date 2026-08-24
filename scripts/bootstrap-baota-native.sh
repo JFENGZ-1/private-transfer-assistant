@@ -4,7 +4,7 @@ IFS=$'\n\t'
 umask 022
 
 readonly REPOSITORY="JFENGZ-1/private-transfer-assistant"
-readonly DEFAULT_REF="v1.4.4"
+readonly DEFAULT_REF="v1.4.5"
 
 log() { printf '\n\033[1;32m[渡口一键安装]\033[0m %s\n' "$*"; }
 die() { printf '\n\033[1;31m[渡口一键安装] 错误：\033[0m%s\n' "$*" >&2; exit 1; }

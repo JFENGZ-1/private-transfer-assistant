@@ -13,7 +13,7 @@ const router = createRouter({
         { path: '', name: 'inbox', component: () => import('./views/InboxView.vue') },
         { path: 'favorites', name: 'favorites', component: () => import('./views/FavoritesView.vue') },
         { path: 'transfers', name: 'transfers', component: () => import('./views/TransfersView.vue') },
-        { path: 'trash', name: 'trash', component: () => import('./views/TrashView.vue') },
+        { path: 'trash', name: 'trash', component: () => import('./views/TrashView.vue'), meta: { trusted: true } },
         { path: 'profile', name: 'profile', component: () => import('./views/ProfileView.vue') },
         { path: 'settings', name: 'settings', component: () => import('./views/SettingsView.vue'), meta: { trusted: true } },
       ]
