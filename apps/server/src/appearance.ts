@@ -15,14 +15,16 @@ function iconState(app: FastifyInstance) {
   return {
     custom: setting(app.db, 'pwa_icon_custom') === 'true',
     version: Number(setting(app.db, 'pwa_icon_version')) || 2,
+    siteTitle: setting(app.db, 'site_title') ?? '渡口',
+    tabTitle: setting(app.db, 'tab_title') ?? '渡口 · 私人传输助手',
   };
 }
 
-function manifest(version: number) {
+function manifest(version: number, siteTitle: string, tabTitle: string) {
   const icon = (size: 192 | 512) => `/api/appearance/icon/${size}.png?v=${version}`;
   return {
-    name: '渡口 · 私人传输助手',
-    short_name: '渡口',
+    name: tabTitle,
+    short_name: siteTitle,
     description: '私人文件传输与跨设备粘贴板',
     theme_color: '#f6f3ed',
     background_color: '#f6f3ed',
@@ -63,8 +65,8 @@ async function writeIconSet(app: FastifyInstance, small: Buffer, large: Buffer) 
 export async function appearanceRoutes(app: FastifyInstance) {
   app.get('/api/appearance', async () => iconState(app));
   app.get('/api/appearance/manifest.webmanifest', async (_req, reply) => {
-    const { version } = iconState(app);
-    return reply.header('Cache-Control', 'no-cache').type('application/manifest+json').send(manifest(version));
+    const { version, siteTitle, tabTitle } = iconState(app);
+    return reply.header('Cache-Control', 'no-cache').type('application/manifest+json').send(manifest(version, siteTitle, tabTitle));
   });
   app.get('/api/appearance/icon/:size.png', async (req, reply) => {
     const { size } = z.object({ size: z.coerce.number().pipe(z.union([z.literal(192), z.literal(512)])) }).parse(req.params);

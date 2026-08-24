@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { ChevronDown, Combine, Download, Heart, Inbox, Lock, Pin, Trash2, Unlock, X } from 'lucide-vue-next'
+import { ChevronDown, Combine, Download, Heart, Inbox, Lock, Pin, Share2, Trash2, Unlock, X } from 'lucide-vue-next'
 import { api, errorText } from '../api'
 import { isTrusted, state } from '../state'
 import type { Message } from '../types'
@@ -8,11 +8,14 @@ import { formatChatTimestamp, notify, requestConfirm, shouldShowChatTimestamp, u
 import ComposerBar from '../components/ComposerBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MessageCard from '../components/MessageCard.vue'
+import BatchShareDialog from '../components/BatchShareDialog.vue'
 
-const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const pinnedOpen = computed({ get: () => ui.inboxPinnedOpen, set: value => { ui.inboxPinnedOpen = value } }); const timelineEnd = ref<HTMLElement>()
+const loading = ref(true); const error = ref(''); const selecting = ref(false); const selected = ref<string[]>([]); const shareOpen=ref(false); const pinnedOpen = computed({ get: () => ui.inboxPinnedOpen, set: value => { ui.inboxPinnedOpen = value } }); const timelineEnd = ref<HTMLElement>()
 const pinned = computed(() => state.messages.filter(m => m.pinned).sort((a,b) => b.createdAt-a.createdAt))
 const regular = computed(() => state.messages.filter(m => !m.pinned).sort((a,b) => a.createdAt-b.createdAt))
 const timeline = computed(() => regular.value.map((message,index,array) => ({ message, label: shouldShowChatTimestamp(message.createdAt,array[index-1]?.createdAt) ? formatChatTimestamp(message.createdAt) : '' })))
+const selectedItems=computed(()=>state.messages.filter(message=>selected.value.includes(message.id)))
+const allSelectedPrivate=computed(()=>Boolean(selectedItems.value.length)&&selectedItems.value.every(message=>message.visibility==='trusted_only'))
 function scrollToLatest(behavior:ScrollBehavior='auto'){void nextTick(()=>timelineEnd.value?.scrollIntoView({behavior,block:'end'}))}
 function togglePinned(){pinnedOpen.value=!pinnedOpen.value}
 async function load(initial=false) { if(initial)loading.value = true; error.value = ''; try { state.messages = (await api.messages({ limit: 100 })).items } catch (e) { error.value = errorText(e) } finally { loading.value = false } if(initial)scrollToLatest() }
@@ -25,6 +28,7 @@ function cancelSelection(){selecting.value=false;selected.value=[]}
 function startMerge(id:string){selecting.value=true;selected.value=[id];notify('再选择至少一条文本消息，然后点击合并','success')}
 async function mergeSelected(){const items=state.messages.filter(message=>selected.value.includes(message.id));if(items.length<2){notify('请至少选择两条消息','error');return}if(items.some(message=>message.type!=='text')){notify('只能合并文本消息','error');return}if(!await requestConfirm(`按时间顺序合并 ${items.length} 条消息到日期最早的那条？其余消息会移入回收站。`,{title:'合并消息',confirmText:'确认合并'}))return;try{await api.mergeMessages(selected.value);selected.value=[];selecting.value=false;await load();notify('已合并到最早的消息','success')}catch(e){notify(errorText(e),'error')}}
 async function batch(action: 'delete'|'favorite'|'pin'|'lock'|'unlock') { try { if (action === 'delete' && !await requestConfirm(`将 ${selected.value.length} 条内容移到回收站？`,{title:'批量删除',confirmText:'移入回收站',danger:true})) return; await api.batchMessages(selected.value, action); await load(); selected.value = []; selecting.value = false; notify('批量操作已完成', 'success') } catch (e) { notify(errorText(e), 'error') } }
+function togglePrivacy(){void batch(allSelectedPrivate.value?'unlock':'lock')}
 async function batchDownload() {
   const items = state.messages.filter(message => selected.value.includes(message.id))
   const texts = items.filter(message => message.type === 'text' && message.content).map(message => `${new Date(message.createdAt).toLocaleString('zh-CN')}\n${message.content}`)
@@ -48,5 +52,6 @@ onMounted(() => { void load(true); window.addEventListener('messages-changed', r
   <EmptyState v-else-if="!state.messages.length" :icon="Inbox" title="从第一次传递开始" description="粘贴一段文字，或从手机选择图片与文件。" />
   <template v-else><div class="message-list chat-timeline"><template v-for="entry in timeline" :key="entry.message.id"><div v-if="entry.label" class="chat-time-label">{{ entry.label }}</div><MessageCard :message="entry.message" chat select-from-menu :show-time="false" :selectable="selecting" :selected="selected.includes(entry.message.id)" @select="select" @selection-start="startSelection" @merge-start="startMerge" @update="update" @remove="remove" /></template><div ref="timelineEnd" class="timeline-end" aria-hidden="true" /></div></template>
   <ComposerBar v-if="!selecting" @sent="add" />
-  <div v-else class="batch-bar"><span>已选 {{ selected.length }} 条</span><button :disabled="selected.length < 2" @click="mergeSelected"><Combine :size="17" />合并</button><button :disabled="!selected.length" @click="batchDownload"><Download :size="17" />下载</button><button :disabled="!selected.length" @click="batch('favorite')"><Heart :size="17" />收藏</button><button :disabled="!selected.length" @click="batch('pin')"><Pin :size="17" />置顶</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('lock')"><Lock :size="17" />隐私</button><button v-if="isTrusted" :disabled="!selected.length" @click="batch('unlock')"><Unlock :size="17" />取消锁</button><button :disabled="!selected.length" @click="batch('delete')"><Trash2 :size="17" />删除</button><button @click="cancelSelection"><X :size="17" />取消</button></div>
+  <div v-else class="batch-bar"><span>已选 {{ selected.length }} 条</span><button :disabled="selected.length < 2" @click="mergeSelected"><Combine :size="17" />合并</button><button :disabled="!selected.length" @click="batchDownload"><Download :size="17" />下载</button><button :disabled="!selected.length" @click="batch('favorite')"><Heart :size="17" />收藏</button><button :disabled="!selected.length" @click="batch('pin')"><Pin :size="17" />置顶</button><button v-if="isTrusted" :disabled="!selected.length" :aria-pressed="allSelectedPrivate" @click="togglePrivacy"><Unlock v-if="allSelectedPrivate" :size="17"/><Lock v-else :size="17"/>{{allSelectedPrivate?'取消锁':'隐私锁'}}</button><button :disabled="!selected.length" @click="shareOpen=true"><Share2 :size="17"/>分享</button><button :disabled="!selected.length" @click="batch('delete')"><Trash2 :size="17" />删除</button><button @click="cancelSelection"><X :size="17" />取消</button></div>
+  <BatchShareDialog :open="shareOpen" :messages="selectedItems" @close="shareOpen=false"/>
 </section></template>

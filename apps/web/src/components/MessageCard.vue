@@ -1,25 +1,32 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
-import { ArchiveRestore, Combine, Copy, Download, Eye, FileArchive, FileText, Heart, Image, ListChecks, Lock, Pencil, Pin, QrCode, RotateCcw, Share2, Star, Tag, Trash2, Unlock } from 'lucide-vue-next'
+import { ArchiveRestore, Combine, Copy, Download, Eye, FileArchive, FileAudio, FileCode2, FileText, Heart, Image, ListChecks, Lock, Pencil, Pin, Play, QrCode, RotateCcw, Share2, Star, Tag, Trash2, Unlock, Video } from 'lucide-vue-next'
 import type { Message } from '../types'
 import { api, errorText } from '../api'
 import { copyText, formatBytes, formatTime, notify, requestConfirm } from '../ui'
 import { isTrusted } from '../state'
 import BaseDialog from './BaseDialog.vue'
+import FilePreviewContent from './FilePreviewContent.vue'
+import CopyableValue from './CopyableValue.vue'
+import ShareParameterFields from './ShareParameterFields.vue'
+import { filePreviewKind } from '../preview'
 
 const props = withDefaults(defineProps<{ message: Message; trash?: boolean; selectable?: boolean; selected?: boolean; showTime?: boolean; chat?: boolean; selectFromMenu?: boolean; readonly?: boolean }>(), { showTime: true })
 const emit = defineEmits<{ update: [message: Message]; remove: [id: string]; restore: [id: string]; select: [id: string]; 'selection-start': [id: string]; 'merge-start': [id: string] }>()
-const menu = ref(false); const menuUp = ref(false); const menuMaxHeight = ref(520); const menuWrap = ref<HTMLElement>(); const shareOpen = ref(false); const expiresIn = ref(3600); const maxDownloads = ref<number | null>(1); const code = ref(''); const sharing = ref(false); const shareUrl = ref('')
+const menu = ref(false); const menuUp = ref(false); const menuMaxHeight = ref(520); const menuWrap = ref<HTMLElement>(); const menuPanel = ref<HTMLElement>(); const menuPosition = ref<{left:number;top?:number;bottom?:number}>({left:8,top:8}); const shareOpen = ref(false); const expiresIn = ref(3600); const maxDownloads = ref<number | null>(1); const code = ref(''); const sharing = ref(false); const shareUrl = ref('')
 const editOpen = ref(false); const editTags = ref(''); const editNote = ref(''); const editSaving = ref(false)
 const freeCopyOpen = ref(false); const freeCopyText = ref(''); const freeCopyInput = ref<HTMLTextAreaElement>()
 const freeEditOpen = ref(false); const freeEditText = ref(''); const freeEditInput = ref<HTMLTextAreaElement>(); const freeEditSaving = ref(false)
 const qrOpen = ref(false); const qrLoading = ref(false); const qrImage = ref(''); const qrValue = ref('')
-const thumbTarget = ref<HTMLElement>(); const thumbUrl = ref(''); const thumbFailed = ref(false); const previewOpen = ref(false); const previewUrl = ref(''); const previewLoading = ref(false); let imageObserver: IntersectionObserver | undefined
+const thumbTarget = ref<HTMLElement>(); const thumbUrl = ref(''); const thumbFailed = ref(false); const previewOpen = ref(false); const previewUrl = ref(''); const previewLoading = ref(false); const previewFailed = ref(false); let imageObserver: IntersectionObserver | undefined
 const textTarget = ref<HTMLElement>(); const textExpanded = ref(false); const textOverflowing = ref(false); let textObserver: ResizeObserver | undefined
-const isImage = computed(() => props.message.mime?.startsWith('image/'))
+const previewKind = computed(() => filePreviewKind(props.message))
+const isImage = computed(() => previewKind.value==='image')
+const isVideo = computed(() => previewKind.value==='video')
 const sourceLabel = computed(() => props.message.sourceDeviceName || (props.message.sourceDeviceId ? '本设备' : '临时设备'))
-const Icon = computed(() => isImage.value ? Image : props.message.mime?.includes('zip') ? FileArchive : FileText)
+const Icon = computed(() => isImage.value ? Image : isVideo.value ? Video : previewKind.value==='audio' ? FileAudio : previewKind.value==='html'||previewKind.value==='text' ? FileCode2 : props.message.mime?.includes('zip') ? FileArchive : FileText)
+const menuStyle = computed(() => ({ maxHeight: `${menuMaxHeight.value}px`, left: `${menuPosition.value.left}px`, top: menuPosition.value.top === undefined ? 'auto' : `${menuPosition.value.top}px`, bottom: menuPosition.value.bottom === undefined ? 'auto' : `${menuPosition.value.bottom}px` }))
 async function patch(values: Partial<Message>) { try { const updated = await api.updateMessage(props.message.id, values); emit('update', updated); menu.value = false } catch (e) { notify(errorText(e), 'error') } }
 async function remove() { const permanent=Boolean(props.trash); if (!await requestConfirm(permanent?'删除后无法恢复，确定永久删除这条内容？':'确定将这条内容移到回收站？',{title:permanent?'永久删除':'移到回收站',confirmText:permanent?'永久删除':'移入回收站',danger:true})) return; try { await api.removeMessage(props.message.id, permanent); emit('remove', props.message.id) } catch (e) { notify(errorText(e), 'error') } }
 async function restore() { try { await api.restoreMessage(props.message.id); emit('restore', props.message.id); notify('已恢复', 'success') } catch (e) { notify(errorText(e), 'error') } }
@@ -69,15 +76,17 @@ async function download() {
   try { await api.downloadMessage(props.message.id, props.message.fileName ?? '下载') }
   catch (e) { notify(errorText(e), 'error') }
 }
-async function loadThumbnail() { if (thumbUrl.value || thumbFailed.value || props.trash) return; try { const ticket = await api.downloadTicket(props.message.id); thumbUrl.value = new URL(ticket.url, location.origin).href } catch { thumbFailed.value = true } }
-async function openPreview() { previewOpen.value = true; previewLoading.value = true; previewUrl.value = ''; try { const ticket = await api.downloadTicket(props.message.id); previewUrl.value = new URL(ticket.url, location.origin).href } catch (error) { notify(errorText(error), 'error'); previewOpen.value = false } finally { previewLoading.value = false } }
+async function loadThumbnail() { if (thumbUrl.value || thumbFailed.value || props.trash) return; try { const ticket = await api.previewTicket(props.message.id); thumbUrl.value = new URL(ticket.url, location.origin).href } catch { thumbFailed.value = true } }
+async function openPreview() { previewOpen.value = true; previewLoading.value = true; previewFailed.value = false; previewUrl.value = ''; try { const ticket = await api.previewTicket(props.message.id); previewUrl.value = new URL(ticket.url, location.origin).href } catch (error) { notify(errorText(error), 'error'); previewOpen.value = false } finally { previewLoading.value = false } }
+function closePreview(){previewOpen.value=false;previewUrl.value='';previewFailed.value=false}
 function measureTextOverflow() { const target = textTarget.value; if (!target || textExpanded.value) return; textOverflowing.value = target.scrollHeight > target.clientHeight + 1 }
 function toggleTextExpanded() { textExpanded.value = !textExpanded.value; if (!textExpanded.value) void nextTick(measureTextOverflow) }
-function toggleMenu(event: MouseEvent) { if (menu.value) { menu.value = false; return } const rect = (event.currentTarget as HTMLElement).getBoundingClientRect(); const below = window.innerHeight - rect.bottom - 82; const above = rect.top - 66; menuUp.value = below < Math.min(430, window.innerHeight * .58); menuMaxHeight.value = Math.max(170, Math.min(520, menuUp.value ? above : below)); menu.value = true }
-function closeMenuOnOutside(event:PointerEvent) { if (menu.value && !menuWrap.value?.contains(event.target as Node)) menu.value = false }
+function toggleMenu(event: MouseEvent) { if (menu.value) { menu.value = false; return } const rect = (event.currentTarget as HTMLElement).getBoundingClientRect(),edge=8,gap=4,width=window.innerWidth>=900?195:185,below=window.innerHeight-rect.bottom-gap-edge,above=rect.top-gap-edge; menuUp.value=below<Math.min(430,window.innerHeight*.58)&&above>below;menuMaxHeight.value=Math.max(120,Math.min(520,menuUp.value?above:below));const left=Math.max(edge,Math.min(rect.right-width,window.innerWidth-width-edge));menuPosition.value=menuUp.value?{left,bottom:Math.max(edge,window.innerHeight-rect.top+gap)}:{left,top:Math.max(edge,rect.bottom+gap)};menu.value=true }
+function closeMenuOnOutside(event:PointerEvent) { const target=event.target as Node;if(menu.value&&!menuWrap.value?.contains(target)&&!menuPanel.value?.contains(target))menu.value=false }
+function closeMenuOnViewportChange(){menu.value=false}
 watch(() => props.message.content, async () => { textExpanded.value = false; await nextTick(); measureTextOverflow() })
-onMounted(async () => { document.addEventListener('pointerdown', closeMenuOnOutside); await nextTick(); measureTextOverflow(); if (textTarget.value) { textObserver = new ResizeObserver(measureTextOverflow); textObserver.observe(textTarget.value) } if (!isImage.value || props.trash || !thumbTarget.value) return; imageObserver = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { void loadThumbnail(); imageObserver?.disconnect() } }, { rootMargin: '180px' }); imageObserver.observe(thumbTarget.value) })
-onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutside); imageObserver?.disconnect(); textObserver?.disconnect() })
+onMounted(async () => { document.addEventListener('pointerdown', closeMenuOnOutside);document.addEventListener('scroll',closeMenuOnViewportChange,true);window.addEventListener('resize',closeMenuOnViewportChange); await nextTick(); measureTextOverflow(); if (textTarget.value) { textObserver = new ResizeObserver(measureTextOverflow); textObserver.observe(textTarget.value) } if (!isImage.value || props.trash || !thumbTarget.value) return; imageObserver = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { void loadThumbnail(); imageObserver?.disconnect() } }, { rootMargin: '180px' }); imageObserver.observe(thumbTarget.value) })
+onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutside);document.removeEventListener('scroll',closeMenuOnViewportChange,true);window.removeEventListener('resize',closeMenuOnViewportChange); imageObserver?.disconnect(); textObserver?.disconnect() })
 </script>
 
 <template>
@@ -87,7 +96,7 @@ onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutsi
     <div class="message-main">
       <div v-if="!readonly" ref="menuWrap" class="message-menu-wrap" @click.stop>
         <button class="icon-button message-more" aria-label="消息操作" :aria-expanded="menu" @click="toggleMenu"><span class="message-more-dots" aria-hidden="true"><i /><i /></span></button>
-        <Transition name="fade"><div v-if="menu" class="context-menu" :class="{ 'open-up': menuUp }" :style="{ maxHeight: `${menuMaxHeight}px` }">
+        <Teleport to="body"><Transition name="fade"><div v-if="menu" ref="menuPanel" class="context-menu portal-menu" :class="{ 'open-up': menuUp }" :style="menuStyle">
           <button @click="copy"><Copy :size="17" />{{ message.type === 'text' ? '复制纯文本' : '复制文件名' }}</button>
           <button v-if="message.type === 'text'" @click="openFreeCopy"><Copy :size="17" />自由复制</button>
           <button v-if="message.type === 'text' && !trash" @click="openFreeEdit"><Pencil :size="17" />自由编辑</button>
@@ -103,13 +112,15 @@ onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutsi
           <button v-if="isTrusted && isImage" @click="api.rerunOcr(message.id).then(() => notify('已加入识别队列', 'success'))"><RotateCcw :size="17" />重新识别</button>
           <button v-if="trash" @click="restore"><ArchiveRestore :size="17" />恢复</button>
           <button class="danger" @click="remove"><Trash2 :size="17" />{{ trash ? '永久删除' : '移到回收站' }}</button>
-        </div></Transition>
+        </div></Transition></Teleport>
       </div>
       <div v-if="message.type === 'file'" class="file-message">
         <button v-if="isImage && !trash && !readonly" ref="thumbTarget" class="image-thumb" aria-label="预览图片" @click.stop="selectable ? $emit('select', message.id) : openPreview()"><img v-if="thumbUrl" :src="thumbUrl" :alt="message.fileName" loading="lazy" @error="thumbFailed = true" /><component :is="Icon" v-else :size="23" /></button>
         <div v-else-if="isImage && !trash" ref="thumbTarget" class="image-thumb"><img v-if="thumbUrl" :src="thumbUrl" :alt="message.fileName" loading="lazy" @error="thumbFailed = true" /><component :is="Icon" v-else :size="23" /></div>
+        <button v-else-if="previewKind && !trash && !readonly" class="file-icon video-thumb" :aria-label="`预览${isVideo?'视频':'文件'}`" @click.stop="selectable ? $emit('select', message.id) : openPreview()"><component :is="Icon" :size="23"/><span class="video-play"><Play v-if="previewKind==='video'||previewKind==='audio'" :size="10" fill="currentColor"/><Eye v-else :size="10"/></span></button>
         <div v-else class="file-icon"><component :is="Icon" :size="23" /></div>
-        <div class="file-copy"><strong>{{ message.fileName }}</strong><span>{{ formatBytes(message.size) }}<template v-if="message.ocrStatus === 'pending' || message.ocrStatus === 'processing'"> · 文字识别中</template></span></div>
+        <button v-if="previewKind && !isImage && !trash && !readonly" class="file-copy file-preview-copy" :aria-label="`预览${message.fileName||'文件'}`" @click.stop="selectable ? $emit('select', message.id) : openPreview()"><strong>{{ message.fileName }}</strong><span>{{ formatBytes(message.size) }}</span></button>
+        <div v-else class="file-copy"><strong>{{ message.fileName }}</strong><span>{{ formatBytes(message.size) }}<template v-if="message.ocrStatus === 'pending' || message.ocrStatus === 'processing'"> · 文字识别中</template></span></div>
         <button v-if="!readonly" class="icon-button soft" aria-label="下载" @click.stop="download"><Download :size="18" /></button>
       </div>
       <div v-else class="text-message-shell" :class="{ expanded: textExpanded, overflowing: textOverflowing }"><p ref="textTarget" class="text-message" :class="{ collapsed: !textExpanded }">{{ message.content }}</p><button v-if="textOverflowing" class="text-expand" :aria-expanded="textExpanded" @click.stop="toggleTextExpanded">{{ textExpanded ? '收起' : '展开' }}</button></div>
@@ -123,10 +134,9 @@ onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutsi
   </article>
 
   <BaseDialog :open="shareOpen" title="创建临时分享" @close="shareOpen = false">
-    <div v-if="shareUrl" class="stack"><div class="success-callout"><Eye :size="18" /><span>分享已创建，仅可访问这条内容。</span></div><label class="field"><span>分享链接</span><input :value="shareUrl" readonly /></label><button class="primary-button" @click="copyText(shareUrl)">复制链接</button></div>
+    <div v-if="shareUrl" class="stack"><div class="success-callout"><Eye :size="18" /><span>分享已创建，仅可访问这条内容。</span></div><CopyableValue label="分享链接" :value="shareUrl"/><button class="primary-button" @click="copyText(shareUrl)">复制链接</button></div>
     <form v-else class="stack" @submit.prevent="createShare">
-      <label class="field"><span>有效期</span><select v-model="expiresIn"><option :value="600">10 分钟</option><option :value="3600">1 小时</option><option :value="86400">24 小时</option><option :value="604800">7 天</option></select></label>
-      <label class="field"><span>最多下载</span><select v-model="maxDownloads"><option :value="1">1 次</option><option :value="5">5 次</option><option :value="null">不限</option></select></label>
+      <ShareParameterFields v-model:expires-in="expiresIn" v-model:max-downloads="maxDownloads" />
       <label class="field"><span>提取码（可选）</span><input v-model="code" maxlength="32" placeholder="留空则无需提取码" /></label>
       <div v-if="message.visibility === 'trusted_only'" class="warning-callout"><Lock :size="18" />分享后，持链接者可在有效期内访问这条隐私内容。</div>
       <button class="primary-button" :disabled="sharing">{{ sharing ? '正在创建…' : '创建分享' }}</button>
@@ -151,12 +161,13 @@ onUnmounted(() => { document.removeEventListener('pointerdown', closeMenuOnOutsi
       <img v-else-if="qrImage" :src="qrImage" alt="消息二维码" />
       <p v-if="message.type === 'file'">文件二维码使用一小时临时分享链接。</p>
       <p v-else>扫码后可在其他设备上读取这段文本。</p>
+      <CopyableValue v-if="qrImage" :label="message.type === 'file' ? '分享链接' : '二维码内容'" :value="qrValue" />
       <div v-if="qrImage" class="button-row"><button class="secondary-button" @click="copyText(qrValue)"><Copy :size="17" />复制内容</button><button class="primary-button" @click="saveQrImage"><Download :size="17" />保存图片</button></div>
     </div>
   </BaseDialog>
-  <BaseDialog :open="previewOpen" :title="message.fileName || '图片预览'" wide @close="previewOpen = false">
-    <div class="image-preview"><div v-if="previewLoading" class="image-preview-loading">正在打开原图…</div><img v-else-if="previewUrl" :src="previewUrl" :alt="message.fileName" /></div>
-    <template #footer><button class="primary-button full" @click="download"><Download :size="18" />下载原图</button></template>
+  <BaseDialog :open="previewOpen" :title="message.fileName || '文件预览'" wide @close="closePreview">
+    <div class="image-preview media-preview"><div v-if="previewLoading" class="image-preview-loading">正在打开预览…</div><p v-else-if="previewFailed" class="media-preview-failed">当前浏览器无法预览该文件，请下载后查看。</p><FilePreviewContent v-else-if="previewUrl && previewKind" :kind="previewKind" :src="previewUrl" :title="message.fileName || '文件'" @error="previewFailed = true"/></div>
+    <template #footer><button class="primary-button full" @click="download"><Download :size="18" />下载原文件</button></template>
   </BaseDialog>
 </template>
 

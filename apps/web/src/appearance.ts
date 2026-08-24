@@ -1,4 +1,15 @@
+import { reactive } from 'vue'
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
+
+const DEFAULT_SITE_TITLE = '渡口'
+const DEFAULT_TAB_TITLE = '渡口 · 私人传输助手'
+
+export const siteAppearance = reactive({
+  siteTitle: DEFAULT_SITE_TITLE,
+  tabTitle: DEFAULT_TAB_TITLE,
+  iconVersion: 2,
+})
 
 export function pwaIconUrl(version?: number, size: 192 | 512 = 512) {
   return `${API_BASE}/appearance/icon/${size}.png${version ? `?v=${version}` : ''}`
@@ -23,20 +34,33 @@ export async function preparePwaIcons(file: File) {
   } finally { source.close() }
 }
 
+function refreshManifest() {
+  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+  if (manifest) manifest.href = `${API_BASE}/appearance/manifest.webmanifest?v=${siteAppearance.iconVersion}&title=${encodeURIComponent(siteAppearance.siteTitle)}&tab=${encodeURIComponent(siteAppearance.tabTitle)}`
+}
+
+export function applySiteAppearance(value?: { siteTitle?: string; tabTitle?: string }) {
+  siteAppearance.siteTitle = value?.siteTitle?.trim() || DEFAULT_SITE_TITLE
+  siteAppearance.tabTitle = value?.tabTitle?.trim() || DEFAULT_TAB_TITLE
+  document.title = siteAppearance.tabTitle
+  refreshManifest()
+}
+
 export function applyPwaAppearance(version: number) {
+  siteAppearance.iconVersion = version
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
   const appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
-  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
   if (favicon) { favicon.href = pwaIconUrl(version, 192); favicon.type = 'image/png' }
   if (appleIcon) appleIcon.href = pwaIconUrl(version, 192)
-  if (manifest) manifest.href = `${API_BASE}/appearance/manifest.webmanifest?v=${version}`
+  refreshManifest()
 }
 
 export async function loadPwaAppearance() {
   try {
     const response = await fetch(`${API_BASE}/appearance`, { credentials: 'include' })
     if (!response.ok) return
-    const value = await response.json() as { version?: number }
+    const value = await response.json() as { version?: number; siteTitle?: string; tabTitle?: string }
+    applySiteAppearance(value)
     if (value.version) applyPwaAppearance(value.version)
   } catch { /* The static default icon remains available while offline. */ }
 }

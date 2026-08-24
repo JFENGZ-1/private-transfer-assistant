@@ -37,8 +37,12 @@ CREATE TABLE IF NOT EXISTS shares(
  id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,message_id TEXT NOT NULL REFERENCES messages(id),code_hash TEXT,
  expires_at INTEGER NOT NULL,max_downloads INTEGER,downloads INTEGER NOT NULL DEFAULT 0,revoked_at INTEGER,created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS share_messages(
+ share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,message_id TEXT NOT NULL REFERENCES messages(id),
+ position INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(share_id,message_id)
+);
 CREATE TABLE IF NOT EXISTS drops(
- id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,name TEXT NOT NULL,expires_at INTEGER NOT NULL,max_uploads INTEGER,
+ id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,token_value TEXT,name TEXT NOT NULL,expires_at INTEGER NOT NULL,max_uploads INTEGER,
  uploads INTEGER NOT NULL DEFAULT 0,max_file_size INTEGER,allowed_types TEXT NOT NULL DEFAULT '[]',revoked_at INTEGER,created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS ocr_jobs(
@@ -46,6 +50,10 @@ CREATE TABLE IF NOT EXISTS ocr_jobs(
  attempts INTEGER NOT NULL DEFAULT 0,error TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(message_id)
 );
 CREATE TABLE IF NOT EXISTS download_tokens(
+ token_hash TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+ expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS preview_tokens(
  token_hash TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
  expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL
 );
@@ -60,8 +68,10 @@ CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(deleted_at,pinned DE
 CREATE INDEX IF NOT EXISTS idx_messages_visibility ON messages(visibility,deleted_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash,expires_at);
 CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token_hash,expires_at);
+CREATE INDEX IF NOT EXISTS idx_share_messages_message ON share_messages(message_id,share_id);
 CREATE INDEX IF NOT EXISTS idx_drops_token ON drops(token_hash,expires_at);
 CREATE INDEX IF NOT EXISTS idx_download_tokens_expiry ON download_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_preview_tokens_expiry ON preview_tokens(expires_at);
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(1,unixepoch()*1000);
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(2,unixepoch()*1000);
 INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(3,unixepoch()*1000);
@@ -81,8 +91,10 @@ export function openDatabase(config: AppConfig): AppDb {
   if(!hasColumn('sessions','name'))db.exec('ALTER TABLE sessions ADD COLUMN name TEXT');
   if(!hasColumn('messages','source_session_id'))db.exec('ALTER TABLE messages ADD COLUMN source_session_id TEXT REFERENCES sessions(id)');
   if(!hasColumn('messages','source_name'))db.exec('ALTER TABLE messages ADD COLUMN source_name TEXT');
+  if(!hasColumn('drops','token_value'))db.exec('ALTER TABLE drops ADD COLUMN token_value TEXT');
   db.exec(`UPDATE sessions SET name=CASE WHEN kind='device' THEN COALESCE((SELECT name FROM devices WHERE devices.id=sessions.device_id),'长期设备') ELSE '临时设备' END WHERE name IS NULL OR trim(name)='';
     UPDATE messages SET source_name=COALESCE((SELECT name FROM devices WHERE devices.id=messages.source_device_id),CASE WHEN source_device_id IS NULL THEN '临时设备' ELSE '长期设备' END) WHERE source_name IS NULL OR trim(source_name)='';
+    INSERT OR IGNORE INTO share_messages(share_id,message_id,position) SELECT id,message_id,0 FROM shares;
     INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,unixepoch()*1000);`);
   const searchIndexRepaired=db.prepare('SELECT 1 FROM schema_migrations WHERE version=6').get();
   if(!searchIndexRepaired)db.transaction(()=>{
@@ -91,6 +103,8 @@ export function openDatabase(config: AppConfig): AppDb {
       SELECT id,COALESCE(content,''),COALESCE(file_name,''),COALESCE(ocr_text,''),COALESCE(note,''),COALESCE(tags,'') FROM messages`).run();
     db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(6,?)').run(Date.now());
   })();
+  db.prepare('INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(7,?)').run(Date.now());
+  db.prepare('INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(8,?)').run(Date.now());
   return db;
 }
 

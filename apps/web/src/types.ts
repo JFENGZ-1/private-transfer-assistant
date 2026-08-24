@@ -58,6 +58,8 @@ export type Share = {
   revokedAt?: number | null
   hasCode?: boolean
   createdAt: number
+  itemCount?: number
+  messageIds?: string[]
 }
 
 export type Drop = {
@@ -80,8 +82,29 @@ export type Settings = {
   storage?: { used?: number; limit?: number | null; text?: number; images?: number; files?: number; trash?: number }
   retention?: { imagesDays?: number; filesDays?: number; trashDays?: number; downloadedEarlier?: boolean }
   defaultShare?: { expiresIn: number; maxDownloads?: number | null }
+  branding?: { siteTitle: string; tabTitle: string }
   pwaIcon?: { custom: boolean; version: number }
   retentionDays?: number
+}
+
+export type DiagnosticReport = {
+  level: 'ok' | 'warning' | 'error'
+  checkedAt: number
+  durationMs: number
+  clientLatencyMs?: number
+  items: { key: string; label: string; level: 'ok' | 'warning' | 'error'; detail: string; durationMs: number }[]
+  system: { node: string; platform: string; arch: string; uptimeSeconds: number; rssBytes: number; heapUsedBytes: number; diskFreeBytes: number; diskTotalBytes: number }
+}
+
+export type OcrDiagnosticResult = {
+  level: 'ok' | 'warning' | 'error'
+  status: 'done' | 'failed' | 'timeout' | 'disabled'
+  detail: string
+  recognizedText: string
+  expectedText: string
+  matched?: boolean
+  attempts?: number
+  durationMs: number
 }
 
 export type UploadTask = {
