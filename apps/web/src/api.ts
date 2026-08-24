@@ -39,6 +39,17 @@ function queryString(values: Record<string, unknown>) {
   return text ? `?${text}` : ''
 }
 
+function triggerFileDownload(url: string, fileName?: string) {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName || 'download'
+  link.rel = 'noopener'
+  link.style.display = 'none'
+  document.body.append(link)
+  link.click()
+  link.remove()
+}
+
 export function normalizeMessage(raw: Message): Message {
   return {
     ...raw,
@@ -89,9 +100,9 @@ export const api = {
   downloadUrl: (id: string) => `${API_BASE}/messages/${encodeURIComponent(id)}/download`,
   downloadTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' }),
   previewTicket: (id: string) => request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/preview-token`, { method: 'POST' }),
-  downloadMessage: async (id: string, _fileName?: string) => {
+  downloadMessage: async (id: string, fileName?: string) => {
     const ticket = await request<{ token: string; expiresAt: number; url: string }>(`/messages/${encodeURIComponent(id)}/download-token`, { method: 'POST' })
-    location.assign(new URL(ticket.url, location.origin).href)
+    triggerFileDownload(new URL(ticket.url, location.origin).href, fileName)
   },
   search: async (q: string, filters: SearchFilters, cursor?: number) => {
     const scope = [filters.text && 'text', filters.fileName && 'fileName', filters.imageName !== false && 'imageName', filters.imageText && 'ocr'].filter(Boolean).join(',')
